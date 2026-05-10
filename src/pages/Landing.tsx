@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Smartphone, Zap, Shield, MessageCircle, ArrowRight, CheckCircle2, Mail, Phone } from "lucide-react";
 
@@ -82,10 +82,6 @@ export default function Landing() {
       let savedUsers = savedUsersRaw ? JSON.parse(savedUsersRaw) : [];
 
       if (isRegisterMode) {
-        if (savedUsers.length >= 1) {
-          setError("Pendaftaran ditutup: Maksimal 1 akun diperbolehkan dalam sistem.");
-          return;
-        }
         const existingIndex = savedUsers.findIndex((u: any) => u.email === email);
         if (existingIndex !== -1) {
           setError("Email sudah terdaftar");

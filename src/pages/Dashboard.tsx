@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
 import { Activity, Power, RefreshCw, Trash2, Smartphone, ShieldCheck, FileText, Users, Gamepad2, Settings, Clock, LogOut, MoreVertical, X } from "lucide-react";
@@ -117,7 +117,9 @@ export default function Dashboard() {
     setIsLoadingGroups(true);
     try {
       const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
-      const res = await fetch(`${apiBaseURL}/api/whatsapp/groups`);
+      const res = await fetch(`${apiBaseURL}/api/whatsapp/groups`, {
+        headers: { "x-user-email": currentUserEmail || "default" }
+      });
       const data = await res.json();
       if (data.success) {
         setGroups(data.groups || []);
@@ -141,7 +143,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     const socketUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    const newSocket = io(socketUrl, { path: "/socket.io" });
+    const newSocket = io(socketUrl, { 
+      path: "/socket.io",
+      query: { userEmail: currentUserEmail || "default" }
+    });
 
     newSocket.on("connect", () => {
       console.log("Connected to WebSocket Server");
@@ -187,6 +192,7 @@ export default function Dashboard() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-user-email": currentUserEmail || "default"
         },
         body: body ? JSON.stringify(body) : undefined,
       });
@@ -695,23 +701,6 @@ export default function Dashboard() {
                   <span className="font-medium text-sm text-center">{isConfirmingDelete ? "Klik Lagi (Yakin?)" : "Hapus Sesi"}</span>
                 </button>
               </div>
-
-              <div className="mt-6 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                <h3 className="text-sm font-semibold text-indigo-400 mb-2 flex items-center gap-2">
-                   🌟 Agar Bot Hidup 24/7 (Tanpa Buka Web)
-                </h3>
-                <p className="text-xs text-neutral-400">
-                  Secara default, bot ini menggunakan fitur auto-ping dan mencoba untuk selalu hidup. 
-                  Jika Anda masih mengalami bot mati saat dasbor ditutup (karena server tertidur otomatis), 
-                  silakan gunakan layanan gratis seperti <b>UptimeRobot.com</b>:
-                </p>
-                <div className="mt-2 text-xs bg-neutral-950 border border-neutral-800 p-2 rounded text-emerald-400 font-mono select-all">
-                   URL Ping: {window.location.origin}/api/health
-                </div>
-                <p className="text-[10px] sm:text-xs text-neutral-500 mt-2">
-                   *Buat tipe monitor "HTTP(s)" di UptimeRobot, tempel URL ini, dan set interval ke 1 atau 5 menit.
-                </p>
-              </div>
             </div>
 
             {/* Mass Add Members */}
@@ -815,7 +804,7 @@ export default function Dashboard() {
                   <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center gap-4">
                     <div className="bg-blue-500/20 p-3 rounded-xl text-blue-400"><Users className="w-6 h-6" /></div>
                     <div>
-                      <h3 className="text-2xl font-bold text-white">1</h3>
+                      <h3 className="text-2xl font-bold text-white">{JSON.parse(localStorage.getItem('app_mock_users') || '[]').length}</h3>
                       <p className="text-xs text-neutral-400 mt-1">Total Pengguna Terdaftar</p>
                     </div>
                   </div>

@@ -20,6 +20,10 @@ const AUTH_FOLDER = path.join(process.cwd(), "auth_info_baileys");
 const msgRetryCounterCache = new NodeCache();
 
 export class WhatsAppBot {
+  public userEmail: string;
+  private authFolder: string;
+  private settingsFile: string;
+
   private sock: any = null;
   private io: SocketIOServer;
   private status: "disconnected" | "connecting" | "connected" = "disconnected";
@@ -47,8 +51,11 @@ export class WhatsAppBot {
 
   private connectionMonitor: any = null;
 
-  constructor(io: SocketIOServer) {
+  constructor(io: SocketIOServer, userEmail: string = "default") {
     this.io = io;
+    this.userEmail = userEmail;
+    this.authFolder = path.join(process.cwd(), `auth_info_baileys_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`);
+    this.settingsFile = path.join(process.cwd(), `group_settings_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}.json`);
     this.loadGroupSettings();
     
     // Auto-reconnect monitor every 3 minutes
@@ -73,7 +80,7 @@ export class WhatsAppBot {
 
   private loadGroupSettings() {
     try {
-      const data = fs.readFileSync(path.join(process.cwd(), "group_settings.json"), "utf8");
+      const data = fs.readFileSync(this.settingsFile, "utf8");
       const obj = JSON.parse(data);
       for (const [k, v] of Object.entries(obj)) {
         this.groupSettings.set(k, v as any);
@@ -85,7 +92,7 @@ export class WhatsAppBot {
 
   private saveGroupSettings() {
     const obj = Object.fromEntries(this.groupSettings);
-    fs.writeFileSync(path.join(process.cwd(), "group_settings.json"), JSON.stringify(obj, null, 2));
+    fs.writeFileSync(this.settingsFile, JSON.stringify(obj, null, 2));
   }
 
   public getStatus() {
@@ -123,7 +130,7 @@ export class WhatsAppBot {
     this.broadcastState("Starting initialization...");
 
     try {
-      const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+      const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
       
       const { version, isLatest } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] as any, isLatest: false }));
       this.broadcastState(`Using WA v${version.join('.')}, isLatest: ${isLatest}`);
@@ -150,7 +157,7 @@ export class WhatsAppBot {
             const code = await this.sock.requestPairingCode(phoneNumber);
             const formattedCode = code?.match(/.{1,4}/g)?.join("-") || code;
             this.broadcastState(`Pairing code generated: ${formattedCode}`);
-            this.io.emit("pairing_code", formattedCode);
+            this.io.to(this.userEmail).emit("pairing_code", formattedCode);
           } catch (err: any) {
             const errorMsg = err?.message || err;
             if (String(errorMsg).includes("Connection Closed") || String(errorMsg).includes("Precondition Required")) {
@@ -169,7 +176,7 @@ export class WhatsAppBot {
         if (qr) {
           if (!phoneNumber) {
             this.currentQr = qr;
-            this.io.emit("qr", qr);
+            this.io.to(this.userEmail).emit("qr", qr);
             this.broadcastState("QR Code generated. Please scan.");
           }
         }
@@ -219,7 +226,7 @@ export class WhatsAppBot {
         } else if (connection === "open") {
           this.updateStatus("connected");
           this.currentQr = null;
-          this.io.emit("pairing_code", null);
+          this.io.to(this.userEmail).emit("pairing_code", null);
           this.broadcastState("Bot connected successfully!");
         }
       });
@@ -345,9 +352,9 @@ export class WhatsAppBot {
   public async deleteSession() {
     await this.stop();
     this.broadcastState("Deleting session...");
-    if (fs.existsSync(AUTH_FOLDER)) {
+    if (fs.existsSync(this.authFolder)) {
       try {
-        fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
+        fs.rmSync(this.authFolder, { recursive: true, force: true });
         this.broadcastState("Session deleted cleanly.");
       } catch (err) {
         console.error("Error deleting auth folder", err);
@@ -420,12 +427,12 @@ export class WhatsAppBot {
     } else {
       this.connectedAt = null;
     }
-    this.io.emit("status", this.getStatus());
+    this.io.to(this.userEmail).emit("status", this.getStatus());
   }
 
   private broadcastState(message: string) {
-    console.log(message);
-    this.io.emit("log", { time: new Date().toISOString(), message });
+    console.log(`[${this.userEmail}] ${message}`);
+    this.io.to(this.userEmail).emit("log", { time: new Date().toISOString(), message });
   }
 
   private async handleIncomingMessage(msg: any) {

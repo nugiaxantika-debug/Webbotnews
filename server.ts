@@ -41,14 +41,33 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Initialize WhatsApp Bot Manager
-  const waBot = new WhatsAppBot(io);
+  const userBots = new Map<string, WhatsAppBot>();
+  let activeBots: string[] = [];
+  try {
+    if (fs.existsSync("active_bots.json")) {
+      activeBots = JSON.parse(fs.readFileSync("active_bots.json", "utf-8"));
+    }
+  } catch (e) {}
 
-  // Auto-start if session exists
-  const sessionPath = path.join(process.cwd(), "auth_info_baileys", "creds.json");
-  if (fs.existsSync(sessionPath)) {
-    console.log("Found existing session. Auto-starting WhatsApp Bot...");
-    setTimeout(() => { waBot.start(); }, 1000); // 1s delay to let server boot up
+  for (const email of activeBots) {
+    if (!userBots.has(email)) {
+      const waBot = new WhatsAppBot(io, email);
+      userBots.set(email, waBot);
+      setTimeout(() => { waBot.start(); }, 1000); // 1s delay
+    }
+  }
+
+  function getWaBot(req: express.Request): WhatsAppBot {
+    let email = req.headers["x-user-email"] as string;
+    if (!email) email = "default";
+    if (!userBots.has(email)) {
+      userBots.set(email, new WhatsAppBot(io, email));
+      if (!activeBots.includes(email)) {
+        activeBots.push(email);
+        fs.writeFileSync("active_bots.json", JSON.stringify(activeBots));
+      }
+    }
+    return userBots.get(email)!;
   }
 
   // API Routes
@@ -57,33 +76,33 @@ async function startServer() {
   });
 
   app.get("/api/whatsapp/status", (req, res) => {
-    res.json(waBot.getStatus());
+    res.json(getWaBot(req).getStatus());
   });
 
   app.post("/api/whatsapp/start", async (req, res) => {
     const { phoneNumber } = req.body;
-    await waBot.start(phoneNumber);
+    await getWaBot(req).start(phoneNumber);
     res.json({ success: true, message: "Start initiated" });
   });
 
   app.post("/api/whatsapp/stop", async (req, res) => {
-    await waBot.stop();
+    await getWaBot(req).stop();
     res.json({ success: true, message: "Stop initiated" });
   });
 
   app.post("/api/whatsapp/restart", async (req, res) => {
-    await waBot.restart();
+    await getWaBot(req).restart();
     res.json({ success: true, message: "Restart initiated" });
   });
 
   app.post("/api/whatsapp/delete-session", async (req, res) => {
-    await waBot.deleteSession();
+    await getWaBot(req).deleteSession();
     res.json({ success: true, message: "Session deleted" });
   });
 
   app.get("/api/whatsapp/groups", async (req, res) => {
     try {
-      const groups = await waBot.getGroups();
+      const groups = await getWaBot(req).getGroups();
       res.json({ success: true, groups });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -96,7 +115,7 @@ async function startServer() {
       return res.status(400).json({ error: "Invalid parameters. Require groupId and a numbers array." });
     }
     try {
-      waBot.massAddGroupMembers(groupId, numbers).catch(err => console.error("Mass add background error:", err));
+      getWaBot(req).massAddGroupMembers(groupId, numbers).catch(err => console.error("Mass add background error:", err));
       res.json({ success: true, message: `Memulai proses mass add untuk ${numbers.length} anggota di background.` });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -104,11 +123,23 @@ async function startServer() {
   });
 
   io.on("connection", (socket) => {
-    console.log("Client connected via WebSocket");
-    socket.emit("status", waBot.getStatus());
+    const userEmail = typeof socket.handshake.query.userEmail === "string" ? socket.handshake.query.userEmail : "default";
+    socket.join(userEmail);
+    console.log(`Client connected via WebSocket: ${userEmail}`);
+    
+    // Ensure bot exists for this user
+    if (!userBots.has(userEmail)) {
+      userBots.set(userEmail, new WhatsAppBot(io, userEmail));
+      if (!activeBots.includes(userEmail)) {
+        activeBots.push(userEmail);
+        fs.writeFileSync("active_bots.json", JSON.stringify(activeBots));
+      }
+    }
+    
+    socket.emit("status", userBots.get(userEmail)!.getStatus());
 
     socket.on("disconnect", () => {
-      console.log("Client disconnected");
+      console.log(`Client disconnected: ${userEmail}`);
     });
   });
 
