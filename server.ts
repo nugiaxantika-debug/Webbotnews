@@ -71,6 +71,67 @@ async function startServer() {
   }
 
   // API Routes
+  // Auth endpoints
+  app.post("/api/auth/register", (req, res) => {
+    const { email, password } = req.body;
+    let users: any[] = [];
+    try {
+      if (fs.existsSync("auth.json")) {
+        users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+      }
+    } catch(e){}
+    if (users.find(u => u.email === email)) {
+      return res.status(400).json({ error: "Email sudah terdaftar" });
+    }
+    users.push({ email, password });
+    fs.writeFileSync("auth.json", JSON.stringify(users, null, 2));
+    res.json({ success: true, email });
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    const { email, password } = req.body;
+    let users: any[] = [];
+    try {
+      if (fs.existsSync("auth.json")) {
+        users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+      }
+    } catch(e){}
+    const user = users.find(u => u.email === email && u.password === password);
+    if (!user) {
+      return res.status(401).json({ error: "Email atau password salah." });
+    }
+    res.json({ success: true, email });
+  });
+
+  app.get("/api/users/count", (req, res) => {
+    let users: any[] = [];
+    try {
+      if (fs.existsSync("auth.json")) {
+        users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+      }
+    } catch(e){}
+    res.json({ count: users.length });
+  });
+
+  app.get("/api/config", (req, res) => {
+    let config = {};
+    try {
+      if (fs.existsSync("web_config.json")) {
+        config = JSON.parse(fs.readFileSync("web_config.json", "utf-8"));
+      }
+    } catch(e){}
+    res.json({ config });
+  });
+
+  app.post("/api/config", (req, res) => {
+    try {
+      fs.writeFileSync("web_config.json", JSON.stringify(req.body.config, null, 2));
+      res.json({ success: true });
+    } catch(e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });

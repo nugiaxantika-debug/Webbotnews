@@ -47,10 +47,15 @@ export default function Landing() {
   });
 
   useEffect(() => {
-    const saved = localStorage.getItem("wabotWebConfig");
-    if (saved) {
-      setWebConfig(prev => ({ ...prev, ...JSON.parse(saved) }));
-    }
+    const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+    fetch(`${apiBaseURL}/api/config`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.config && Object.keys(data.config).length > 0) {
+          setWebConfig(prev => ({ ...prev, ...data.config }));
+        }
+      })
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -78,30 +83,22 @@ export default function Landing() {
     setError("");
     
     try {
-      const savedUsersRaw = localStorage.getItem("app_mock_users");
-      let savedUsers = savedUsersRaw ? JSON.parse(savedUsersRaw) : [];
-
-      if (isRegisterMode) {
-        const existingIndex = savedUsers.findIndex((u: any) => u.email === email);
-        if (existingIndex !== -1) {
-          setError("Email sudah terdaftar");
-          return;
-        }
-        savedUsers.push({ email, password });
-        localStorage.setItem("app_mock_users", JSON.stringify(savedUsers));
-        localStorage.setItem("mock_user_email", email);
-        navigate("/dashboard");
-      } else {
-        const user = savedUsers.find((u: any) => u.email === email && u.password === password);
-        if (user) {
-          localStorage.setItem("mock_user_email", email);
-          navigate("/dashboard");
-        } else {
-          setError("Email atau password salah. Pastikan Anda sudah mendaftar.");
-        }
+      const endpoint = isRegisterMode ? "/api/auth/register" : "/api/auth/login";
+      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+      const res = await fetch(`${apiBaseURL}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Terjadi kesalahan.");
+        return;
       }
+      localStorage.setItem("mock_user_email", email);
+      navigate("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Terjadi kesalahan.");
+      setError(err.message || "Terjadi kesalahan koneksi.");
     }
   };
 

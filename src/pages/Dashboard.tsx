@@ -38,6 +38,18 @@ export default function Dashboard() {
   const currentUserEmail = localStorage.getItem("mock_user_email");
   const isAdmin = currentUserEmail === "nugiaxantika@gmail.com";
 
+  const [totalUsers, setTotalUsers] = useState<number>(0);
+
+  useEffect(() => {
+    if (isAdmin) {
+      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+      fetch(`${apiBaseURL}/api/users/count`)
+        .then(res => res.json())
+        .then(data => setTotalUsers(data.count || 0))
+        .catch(err => console.error(err));
+    }
+  }, [isAdmin]);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [webConfig, setWebConfig] = useState({
@@ -77,10 +89,15 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    const saved = localStorage.getItem("wabotWebConfig");
-    if (saved) {
-      setWebConfig(JSON.parse(saved));
-    }
+    const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+    fetch(`${apiBaseURL}/api/config`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.config && Object.keys(data.config).length > 0) {
+          setWebConfig(prev => ({ ...prev, ...data.config }));
+        }
+      })
+      .catch(console.error);
   }, []);
 
   // Simulate auto-disconnect logic
@@ -254,9 +271,18 @@ export default function Dashboard() {
     return parts.join(' ');
   };
 
-  const handleSaveSettings = () => {
-    localStorage.setItem("wabotWebConfig", JSON.stringify(webConfig));
-    setIsSettingsOpen(false);
+  const handleSaveSettings = async () => {
+    try {
+      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+      await fetch(`${apiBaseURL}/api/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: webConfig })
+      });
+      setIsSettingsOpen(false);
+    } catch (err) {
+      console.error(err);
+    }
   };
   
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, key: string) => {
@@ -804,7 +830,7 @@ export default function Dashboard() {
                   <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center gap-4">
                     <div className="bg-blue-500/20 p-3 rounded-xl text-blue-400"><Users className="w-6 h-6" /></div>
                     <div>
-                      <h3 className="text-2xl font-bold text-white">{JSON.parse(localStorage.getItem('app_mock_users') || '[]').length}</h3>
+                      <h3 className="text-2xl font-bold text-white">{totalUsers}</h3>
                       <p className="text-xs text-neutral-400 mt-1">Total Pengguna Terdaftar</p>
                     </div>
                   </div>
