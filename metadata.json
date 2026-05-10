@@ -1,0 +1,6 @@
+{
+  "name": "WA Bot Dashboard",
+  "description": "Dashboard untuk mengelola Bot WhatsApp secara real-time",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
