@@ -39,15 +39,30 @@ export default function Dashboard() {
   const isAdmin = currentUserEmail === "nugiaxantika@gmail.com";
 
   const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [totalBots, setTotalBots] = useState<number>(0);
+  const [activeBotEmails, setActiveBotEmails] = useState<string[]>([]);
+  const [adminDeleting, setAdminDeleting] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchAdminData = () => {
     if (isAdmin) {
       const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
       fetch(`${apiBaseURL}/api/users/count`)
         .then(res => res.json())
         .then(data => setTotalUsers(data.count || 0))
         .catch(err => console.error(err));
+      
+      fetch(`${apiBaseURL}/api/bots/active`)
+        .then(res => res.json())
+        .then(data => {
+           setTotalBots(data.count || 0);
+           setActiveBotEmails(data.bots || []);
+        })
+        .catch(err => console.error(err));
     }
+  };
+
+  useEffect(() => {
+    fetchAdminData();
   }, [isAdmin]);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -242,6 +257,33 @@ export default function Dashboard() {
     }
     setIsConfirmingDelete(false);
     apiCall("delete-session");
+  };
+
+  const handleAdminDeleteSession = async (targetEmail: string) => {
+    if (!window.confirm(`Yakin ingin memutus sesi bot untuk ${targetEmail}?`)) return;
+    setAdminDeleting(targetEmail);
+    try {
+      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+      const res = await fetch(`${apiBaseURL}/api/admin/delete-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": currentUserEmail || "default"
+        },
+        body: JSON.stringify({ targetEmail })
+      });
+      if (res.ok) {
+        setLogs(prev => [...prev, { time: new Date().toISOString(), message: `Admin deleted session for ${targetEmail}` }]);
+        fetchAdminData();
+      } else {
+        alert("Gagal memutus sesi");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error memutus sesi");
+    } finally {
+      setAdminDeleting(null);
+    }
   };
 
   const handleMassAdd = () => {
@@ -895,36 +937,47 @@ export default function Dashboard() {
                   <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center gap-4">
                     <div className="bg-emerald-500/20 p-3 rounded-xl text-emerald-400"><Smartphone className="w-6 h-6" /></div>
                     <div>
-                      <h3 className="text-2xl font-bold text-white">{status === 'connected' ? '1' : '0'}</h3>
+                      <h3 className="text-2xl font-bold text-white">{totalBots}</h3>
                       <p className="text-xs text-neutral-400 mt-1">Nomor Aktif Terhubung</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="text-sm font-medium text-neutral-400">Manajemen Nomor Aktif</h3>
-                  {status === 'connected' ? (
-                    <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                         <span className="relative flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium text-white">Bot Sesi Utama</p>
-                          <p className="text-xs text-neutral-500">Uptime: {formatUptime(uptime)}</p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={handleDeleteSession}
-                        className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg transition-colors border border-rose-500/30"
-                      >
-                        Putuskan Sesi
-                      </button>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-neutral-400">Manajemen Nomor Aktif</h3>
+                    <button onClick={fetchAdminData} className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> Refresh
+                    </button>
+                  </div>
+                  
+                  {activeBotEmails.length > 0 ? (
+                    <div className="space-y-2">
+                       {activeBotEmails.map((email, idx) => (
+                          <div key={idx} className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                               <span className="relative flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                              </span>
+                              <div>
+                                <p className="text-sm font-medium text-white">{email}</p>
+                                <p className="text-xs text-neutral-500">Bot Session Active</p>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => handleAdminDeleteSession(email)}
+                              disabled={adminDeleting === email}
+                              className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg transition-colors border border-rose-500/30 disabled:opacity-50"
+                            >
+                              {adminDeleting === email ? "Memutus..." : "Putuskan Sesi"}
+                            </button>
+                          </div>
+                       ))}
                     </div>
                   ) : (
                     <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl text-center text-sm text-neutral-500">
-                      Tidak ada nomor bot yang sedang terhubung.
+                      Tidak ada nomor bot yang sedang terhubung di sistem.
                     </div>
                   )}
                 </div>

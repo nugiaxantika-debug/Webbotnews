@@ -120,6 +120,16 @@ async function startServer() {
     res.json({ count: users.length });
   });
 
+  app.get("/api/bots/active", (req, res) => {
+    let bots: string[] = [];
+    try {
+      if (fs.existsSync("active_bots.json")) {
+        bots = JSON.parse(fs.readFileSync("active_bots.json", "utf-8"));
+      }
+    } catch(e) {}
+    res.json({ count: bots.length, bots });
+  });
+
   app.get("/api/config", async (req, res) => {
     let config = {};
     try {
@@ -166,6 +176,20 @@ async function startServer() {
   app.post("/api/whatsapp/delete-session", async (req, res) => {
     await getWaBot(req).deleteSession();
     res.json({ success: true, message: "Session deleted" });
+  });
+
+  app.post("/api/admin/delete-session", async (req, res) => {
+    const { targetEmail } = req.body;
+    let currentUser = req.headers["x-user-email"] as string;
+    if (currentUser !== "nugiaxantika@gmail.com") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    if (!targetEmail) return res.status(400).json({ error: "No target email provided" });
+    
+    if (userBots.has(targetEmail)) {
+      await userBots.get(targetEmail)!.deleteSession();
+    }
+    res.json({ success: true, message: "Session deleted for " + targetEmail });
   });
 
   app.get("/api/whatsapp/groups", async (req, res) => {
