@@ -8,19 +8,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { WhatsAppBot } from "./src/services/whatsapp";
 
-// -- Firebase Admin Initialization --
-import { initializeApp as initializeAdminApp } from "firebase-admin/app";
-import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
-let adminDb: FirebaseFirestore.Firestore | null = null;
-try {
-  const fbConfigStr = fs.readFileSync("firebase-applet-config.json", "utf-8");
-  const fbConfig = JSON.parse(fbConfigStr);
-  const adminApp = initializeAdminApp();
-  adminDb = getAdminFirestore(adminApp, fbConfig.firestoreDatabaseId);
-} catch (e: any) {
-  console.error("Firebase admin init error:", e.message);
-}
-// -----------------------------------
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -56,26 +44,7 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  if (adminDb) {
-    try {
-      const systemDoc = await adminDb.collection("system").doc("activeBots").get();
-      if (systemDoc.exists) {
-        fs.writeFileSync("active_bots.json", JSON.stringify(systemDoc.data()?.emails || []));
-      }
-      const usersSnap = await adminDb.collection("users").get();
-      const usersList: any[] = [];
-      usersSnap.forEach(d => usersList.push(d.data()));
-      if (usersList.length > 0) {
-        fs.writeFileSync("auth.json", JSON.stringify(usersList, null, 2));
-      }
-      const configDoc = await adminDb.collection("settings").doc("config").get();
-      if (configDoc.exists) {
-        fs.writeFileSync("web_config.json", JSON.stringify(configDoc.data() || {}, null, 2));
-      }
-    } catch(e) {
-      console.error("Firestore startup sync error:", e);
-    }
-  }
+  
 
   const userBots = new Map<string, WhatsAppBot>();
   let activeBots: string[] = [];
@@ -101,9 +70,7 @@ async function startServer() {
       if (!activeBots.includes(email)) {
         activeBots.push(email);
         fs.writeFileSync("active_bots.json", JSON.stringify(activeBots));
-        if (adminDb) {
-           adminDb.collection("system").doc("activeBots").set({ emails: activeBots }).catch(console.error);
-        }
+        
       }
     }
     return userBots.get(email)!;
@@ -124,13 +91,7 @@ async function startServer() {
     }
     users.push({ email, password });
     fs.writeFileSync("auth.json", JSON.stringify(users, null, 2));
-    if (adminDb) {
-      try {
-        await adminDb.collection("users").doc(email).set({ email, password });
-      } catch (e) {
-        console.error("Error saving user", e);
-      }
-    }
+    
     res.json({ success: true, email });
   });
 
@@ -162,12 +123,7 @@ async function startServer() {
   app.get("/api/config", async (req, res) => {
     let config = {};
     try {
-      if (adminDb) {
-        const docSnap = await adminDb.collection("settings").doc("config").get();
-        if (docSnap.exists) {
-          config = docSnap.data() || {};
-        }
-      } else if (fs.existsSync("web_config.json")) {
+      if (fs.existsSync("web_config.json")) {
         config = JSON.parse(fs.readFileSync("web_config.json", "utf-8"));
       }
     } catch(e){}
@@ -176,10 +132,6 @@ async function startServer() {
 
   app.post("/api/config", async (req, res) => {
     try {
-      if (adminDb) {
-        await adminDb.collection("settings").doc("config").set(req.body.config, { merge: true });
-      }
-      // Always write locally for redundancy or backwards compatibility during deploy rollout
       fs.writeFileSync("web_config.json", JSON.stringify(req.body.config, null, 2));
       res.json({ success: true });
     } catch(e: any) {
@@ -249,9 +201,7 @@ async function startServer() {
       if (!activeBots.includes(userEmail)) {
         activeBots.push(userEmail);
         fs.writeFileSync("active_bots.json", JSON.stringify(activeBots));
-        if (adminDb) {
-           adminDb.collection("system").doc("activeBots").set({ emails: activeBots }).catch(console.error);
-        }
+        
       }
     }
     
