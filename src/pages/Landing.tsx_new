@@ -5,14 +5,7 @@ import { Moon, Sun, Smartphone, Zap, Shield, MessageCircle, ArrowRight, CheckCir
 export default function Landing() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('theme');
-    return saved ? saved === 'dark' : true;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -124,23 +117,14 @@ export default function Landing() {
                 <Smartphone className="w-6 h-6 text-emerald-400" />
               </div>
             )}
-            <span className="text-xl font-bold text-neutral-900 dark:text-white tracking-tight">{webConfig.title}<span className="text-emerald-400">{webConfig.highlight}</span></span>
-          </div>
-          
-          <div className="flex items-center gap-3">
+            
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="p-2 rounded-xl bg-neutral-200 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
-              aria-label="Toggle Dark Mode"
             >
               {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            <button 
-              onClick={() => setIsLoginModalOpen(true)}
-              className="hidden sm:block bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 px-5 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
-            >
-              Masuk
-            </button>
+            <span className="text-xl font-bold text-neutral-900 dark:text-white tracking-tight">{webConfig.title}<span className="text-emerald-400">{webConfig.highlight}</span></span>
           </div>
         </div>
       </nav>
@@ -232,7 +216,7 @@ export default function Landing() {
 
           {/* VIP Tier */}
           <div className="bg-gradient-to-b from-neutral-900 to-neutral-950 border border-amber-500/30 p-8 rounded-3xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-amber-500 text-neutral-950 text-xs font-bold px-3 py-1 rounded-bl-lg">POPULER</div>
+            <div className="absolute top-0 right-0 bg-amber-500 text-neutral-900 dark:text-white dark:text-neutral-950 text-xs font-bold px-3 py-1 rounded-bl-lg">POPULER</div>
             <div className="flex justify-between items-end mb-8">
               <div>
                 <h3 className="text-2xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">{webConfig.plan2Name}</h3>
@@ -254,7 +238,7 @@ export default function Landing() {
               href={`https://wa.me/${webConfig.contactPhone.replace(/\D/g, '')}?text=Halo%20Admin,%20saya%20ingin%20berlangganan%20${encodeURIComponent(webConfig.plan2Name)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full text-center block bg-amber-500 text-neutral-950 py-4 rounded-xl font-bold hover:bg-amber-600 transition-colors"
+              className="w-full text-center block bg-amber-500 text-neutral-900 dark:text-white dark:text-neutral-950 py-4 rounded-xl font-bold hover:bg-amber-600 transition-colors"
             >
               {webConfig.plan2ButtonText}
             </a>

@@ -274,14 +274,19 @@ export default function Dashboard() {
   const handleSaveSettings = async () => {
     try {
       const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
-      await fetch(`${apiBaseURL}/api/config`, {
+      const res = await fetch(`${apiBaseURL}/api/config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ config: webConfig })
       });
+      if (!res.ok) {
+        throw new Error('Gagal menyimpan pengaturan');
+      }
       setIsSettingsOpen(false);
+      alert('Pengaturan berhasil disimpan!');
     } catch (err) {
       console.error(err);
+      alert('Gagal menyimpan pengaturan. Silakan coba lagi.');
     }
   };
   
