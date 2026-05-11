@@ -271,8 +271,11 @@ export default function Dashboard() {
     return parts.join(' ');
   };
 
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
   const handleSaveSettings = async () => {
     try {
+      setSaveStatus("Menyimpan...");
       const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
       const res = await fetch(`${apiBaseURL}/api/config`, {
         method: "POST",
@@ -283,10 +286,11 @@ export default function Dashboard() {
         throw new Error('Gagal menyimpan pengaturan');
       }
       setIsSettingsOpen(false);
-      alert('Pengaturan berhasil disimpan!');
+      setSaveStatus(null);
     } catch (err) {
       console.error(err);
-      alert('Gagal menyimpan pengaturan. Silakan coba lagi.');
+      setSaveStatus("Gagal menyimpan. Coba lagi.");
+      setTimeout(() => setSaveStatus(null), 3000);
     }
   };
   
@@ -523,9 +527,11 @@ export default function Dashboard() {
             </div>
             
             <div className="p-6 border-t border-neutral-800 bg-neutral-900 rounded-b-2xl">
+              {saveStatus && <p className="text-sm font-medium text-amber-400 mb-3 text-center">{saveStatus}</p>}
               <button 
                 onClick={handleSaveSettings}
-                className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl transition-colors"
+                disabled={saveStatus === "Menyimpan..."}
+                className="w-full bg-indigo-500 disabled:opacity-50 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl transition-colors"
                 >
                 Simpan Semua Pengaturan
               </button>
