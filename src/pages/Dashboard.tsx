@@ -85,7 +85,15 @@ export default function Dashboard() {
     plan2Days: 30,
     dashTitle: "WhatsApp Bot Dashboard",
     dashSubtitle: "Kelola bot WhatsApp Anda secara realtime, aman, dan 24 jam.",
-    footerDesc: "Platform bot WhatsApp profesional. Layanan cepat, stabil, dan aman."
+    footerDesc: "Platform bot WhatsApp profesional. Layanan cepat, stabil, dan aman.",
+    loginTitle: "Selamat Datang",
+    loginSubtitle: "Masuk ke dasbor WabotPro Anda",
+    loginEmailParam: "Email",
+    loginEmailPlaceholder: "nama@email.com",
+    loginPasswordParam: "Password",
+    loginPasswordPlaceholder: "••••••••",
+    loginButtonText: "Masuk",
+    loginRegisterText: "Belum punya akun? Daftar"
   });
 
   useEffect(() => {
@@ -491,6 +499,45 @@ export default function Dashboard() {
                     {webConfig.plan2AutoDisconnect && (
                        <input type="number" value={webConfig.plan2Days} onChange={(e) => setWebConfig({...webConfig, plan2Days: parseInt(e.target.value) || 0})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" placeholder="Jumlah Hari Aktif" />
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider">Teks Halaman Login/Register</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Judul Halaman (Login)</label>
+                    <input type="text" value={webConfig.loginTitle} onChange={(e) => setWebConfig({...webConfig, loginTitle: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Sub Judul</label>
+                    <input type="text" value={webConfig.loginSubtitle} onChange={(e) => setWebConfig({...webConfig, loginSubtitle: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Label Email</label>
+                    <input type="text" value={webConfig.loginEmailParam} onChange={(e) => setWebConfig({...webConfig, loginEmailParam: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Placeholder Email</label>
+                    <input type="text" value={webConfig.loginEmailPlaceholder} onChange={(e) => setWebConfig({...webConfig, loginEmailPlaceholder: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Label Password</label>
+                    <input type="text" value={webConfig.loginPasswordParam} onChange={(e) => setWebConfig({...webConfig, loginPasswordParam: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Placeholder Password</label>
+                    <input type="text" value={webConfig.loginPasswordPlaceholder} onChange={(e) => setWebConfig({...webConfig, loginPasswordPlaceholder: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Teks Tombol Masuk</label>
+                    <input type="text" value={webConfig.loginButtonText} onChange={(e) => setWebConfig({...webConfig, loginButtonText: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Teks Switch Belum Punya Akun</label>
+                    <input type="text" value={webConfig.loginRegisterText} onChange={(e) => setWebConfig({...webConfig, loginRegisterText: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
                   </div>
                 </div>
               </div>

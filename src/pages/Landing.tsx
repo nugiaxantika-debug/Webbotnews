@@ -51,7 +51,15 @@ export default function Landing() {
     plan2Days: 30,
     dashTitle: "WhatsApp Bot Dashboard",
     dashSubtitle: "Kelola bot WhatsApp Anda secara realtime, aman, dan 24 jam.",
-    footerDesc: "Platform bot WhatsApp profesional. Layanan cepat, stabil, dan aman."
+    footerDesc: "Platform bot WhatsApp profesional. Layanan cepat, stabil, dan aman.",
+    loginTitle: "Selamat Datang",
+    loginSubtitle: "Masuk ke dasbor WabotPro Anda",
+    loginEmailParam: "Email",
+    loginEmailPlaceholder: "nama@email.com",
+    loginPasswordParam: "Password",
+    loginPasswordPlaceholder: "••••••••",
+    loginButtonText: "Masuk",
+    loginRegisterText: "Belum punya akun? Daftar"
   });
 
   useEffect(() => {
@@ -304,10 +312,10 @@ export default function Landing() {
               ✕
             </button>
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2 text-center">
-              {isRegisterMode ? "Buat Akun Baru" : "Selamat Datang"}
+              {isRegisterMode ? "Buat Akun Baru" : webConfig.loginTitle || "Selamat Datang"}
             </h2>
             <p className="text-neutral-600 dark:text-neutral-400 text-center mb-8 text-sm">
-              {isRegisterMode ? "Daftar untuk mengakses dasbor WabotPro" : "Masuk ke dasbor WabotPro Anda"}
+              {isRegisterMode ? "Daftar untuk mengakses dasbor WabotPro" : webConfig.loginSubtitle || "Masuk ke dasbor WabotPro Anda"}
             </p>
 
             {error && (
@@ -318,43 +326,53 @@ export default function Landing() {
 
             <form onSubmit={handleEmailAuth} className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">Email</label>
+                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">{webConfig.loginEmailParam || "Email"}</label>
                 <input 
                   type="email" 
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-neutral-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                  placeholder="nama@email.com"
+                  placeholder={webConfig.loginEmailPlaceholder || "nama@email.com"}
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">Password</label>
+                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">{webConfig.loginPasswordParam || "Password"}</label>
                 <input 
                   type="password" 
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-neutral-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                  placeholder="••••••••"
+                  placeholder={webConfig.loginPasswordPlaceholder || "••••••••"}
                 />
               </div>
               <button 
                 type="submit"
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-neutral-900 dark:text-white font-bold py-3 rounded-xl transition-colors mt-2"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-neutral-950 font-bold py-3 rounded-xl transition-colors mt-2"
               >
-                {isRegisterMode ? "Daftar" : "Masuk"}
+                {isRegisterMode ? "Daftar" : webConfig.loginButtonText || "Masuk"}
               </button>
             </form>
 
             <p className="text-center text-sm text-neutral-500 mt-6">
-              {isRegisterMode ? "Sudah punya akun? " : "Belum punya akun? "}
-              <button 
-                onClick={() => setIsRegisterMode(!isRegisterMode)}
-                className="text-emerald-400 hover:text-emerald-300 font-medium"
-              >
-                {isRegisterMode ? "Masuk" : "Daftar"}
-              </button>
+              {isRegisterMode ? "Sudah punya akun? " : webConfig.loginRegisterText || "Belum punya akun? Daftar"}
+              {isRegisterMode && (
+                <button 
+                  onClick={() => setIsRegisterMode(!isRegisterMode)}
+                  className="text-emerald-400 hover:text-emerald-300 font-medium ml-1"
+                >
+                  Masuk
+                </button>
+              )}
+              {!isRegisterMode && (!webConfig.loginRegisterText || webConfig.loginRegisterText.toLowerCase() === "belum punya akun? daftar") && (
+                <button 
+                  onClick={() => setIsRegisterMode(!isRegisterMode)}
+                  className="text-emerald-400 hover:text-emerald-300 font-medium ml-1"
+                >
+                  Daftar
+                </button>
+              )}
             </p>
           </div>
         </div>
