@@ -110,6 +110,56 @@ async function startServer() {
     res.json({ success: true, email });
   });
 
+  app.get("/api/user/profile", (req, res) => {
+    const email = req.headers["x-user-email"] as string;
+    if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+    let users: any[] = [];
+    try {
+      if (fs.existsSync("auth.json")) {
+        users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+      }
+    } catch(e){}
+    
+    const user = users.find(u => u.email === email);
+    if (!user) return res.status(404).json({ error: "Not found" });
+
+    res.json({ name: user.name || "", photo: user.photo || "" });
+  });
+
+  app.post("/api/user/profile", async (req, res) => {
+    const email = req.headers["x-user-email"] as string;
+    if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+    const { name, photo } = req.body;
+    let users: any[] = [];
+    try {
+      if (fs.existsSync("auth.json")) {
+        users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+      }
+    } catch(e){}
+
+    const userIdx = users.findIndex(u => u.email === email);
+    if (userIdx > -1) {
+      if (name !== undefined) users[userIdx].name = name;
+      if (photo !== undefined) users[userIdx].photo = photo;
+      fs.writeFileSync("auth.json", JSON.stringify(users, null, 2));
+
+      /*
+      if (adminDb) {
+        try {
+          await adminDb.collection("users").doc(email).set({ name, photo }, { merge: true });
+        } catch(e) {}
+      }
+      */
+      // (The above could be uncommented if we restore adminDb logic later, but for now we write locally)
+
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: "Not found" });
+    }
+  });
+
   app.get("/api/users/count", (req, res) => {
     let users: any[] = [];
     try {

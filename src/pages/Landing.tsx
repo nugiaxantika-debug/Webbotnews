@@ -120,7 +120,13 @@ export default function Landing() {
 
   return (
     <div className={`min-h-screen font-sans ${isDarkMode ? "dark" : ""}`}>
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-200 transition-colors">
+      <div 
+        className={`min-h-screen text-neutral-800 dark:text-neutral-200 transition-colors bg-cover bg-center bg-fixed ${(!webConfig.bgColor && !webConfig.bgImage) ? "bg-neutral-50 dark:bg-neutral-950" : ""}`}
+        style={{
+          backgroundColor: webConfig.bgColor || undefined,
+          backgroundImage: webConfig.bgImage ? `url(${webConfig.bgImage})` : undefined
+        }}
+      >
       {/* Navbar */}
       <nav className="fixed top-0 w-full z-40 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-md border-b border-black/5 dark:border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -166,12 +172,14 @@ export default function Landing() {
           {webConfig.heroDesc}
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <button 
-            onClick={() => setIsLoginModalOpen(true)}
-            className="bg-emerald-500 hover:bg-emerald-600 text-neutral-900 dark:text-white px-8 py-4 rounded-full font-bold text-lg transition-colors flex items-center gap-2 w-full sm:w-auto justify-center"
-          >
-            Mulai Sekarang <ArrowRight className="w-5 h-5" />
-          </button>
+          {webConfig.heroButtonVisible !== false && (
+            <button 
+              onClick={() => setIsLoginModalOpen(true)}
+              className="bg-emerald-500 hover:bg-emerald-600 text-neutral-900 dark:text-white px-8 py-4 rounded-full font-bold text-lg transition-colors flex items-center gap-2 w-full sm:w-auto justify-center"
+            >
+              Mulai Sekarang <ArrowRight className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </section>
 
@@ -204,6 +212,25 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Cara Penggunaan */}
+      {webConfig.howToUseVisible !== false && (
+        <section className="py-24 max-w-7xl mx-auto px-6">
+          <h2 className={`text-3xl font-bold text-neutral-900 dark:text-white mb-16 text-${webConfig.howToUseAlign || 'center'}`}>{webConfig.howToUseTitle || "Cara Penggunaan"}</h2>
+          <div className="grid md:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((step) => (
+              <div key={step} className={`text-${webConfig.howToUseAlign || 'center'}`}>
+                <div className={`w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-2xl font-bold mb-6 ${webConfig.howToUseAlign === 'left' ? 'mr-auto' : webConfig.howToUseAlign === 'right' ? 'ml-auto' : 'mx-auto'}`}>
+                  {step}
+                </div>
+                <h3 className="font-bold text-neutral-900 dark:text-white mb-2">
+                  {webConfig[`howToUseStep${step}` as keyof typeof webConfig] || `Langkah ${step}`}
+                </h3>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Pricing / CTA */}
       <section className="py-24 max-w-7xl mx-auto px-6 text-center">

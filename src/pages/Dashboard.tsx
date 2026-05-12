@@ -67,6 +67,58 @@ export default function Dashboard() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState({ name: "", photo: "" });
+  const [profileUpdateStatus, setProfileUpdateStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentUserEmail) {
+      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+      fetch(`${apiBaseURL}/api/user/profile`, {
+        headers: { "x-user-email": currentUserEmail }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.error) setUserProfile({ name: data.name || "", photo: data.photo || "" });
+      })
+      .catch(console.error);
+    }
+  }, [currentUserEmail]);
+
+  const handleProfileSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+      const res = await fetch(`${apiBaseURL}/api/user/profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-email": currentUserEmail || "default" },
+        body: JSON.stringify(userProfile)
+      });
+      if (!res.ok) throw new Error("Gagal menyimpan");
+      setProfileUpdateStatus("Profil berhasil disimpan!");
+      setIsProfileOpen(false);
+      setTimeout(() => setProfileUpdateStatus(null), 3000);
+    } catch (err) {
+       console.error(err);
+       setProfileUpdateStatus("Gagal menyimpan profil.");
+       setTimeout(() => setProfileUpdateStatus(null), 3000);
+    }
+  };
+
+  const handleProfilePicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setUserProfile({ ...userProfile, photo: event.target.result as string });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const [webConfig, setWebConfig] = useState({
     title: "Wabot",
     highlight: "Pro",
@@ -358,6 +410,75 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-200 font-sans p-4 md:p-8">
       {/* Settings Modal */}
+      {isProfileOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl max-w-md w-full animate-in fade-in zoom-in duration-300">
+            <div className="p-6 border-b border-neutral-800 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-400" /> Edit Profil
+              </h2>
+              <button 
+                onClick={() => setIsProfileOpen(false)}
+                className="text-neutral-500 hover:text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={handleProfileSave} className="p-6 space-y-6">
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  {userProfile.photo ? (
+                    <img src={userProfile.photo} className="w-24 h-24 rounded-full object-cover border-4 border-neutral-800" alt="Profile" />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-3xl border-4 border-neutral-800">
+                      {(userProfile.name || currentUserEmail || "U")[0].toUpperCase()}
+                    </div>
+                  )}
+                  <label className="absolute bottom-0 right-0 bg-indigo-500 hover:bg-indigo-600 text-white p-2 rounded-full cursor-pointer transition-colors shadow-lg">
+                    <Smartphone className="w-4 h-4 hidden" /> {/* Hidden icon to trick Tailwind classes, we'll just use a generic upload style */}
+                    <div className="text-xs font-bold leading-none">+</div>
+                    <input type="file" className="hidden" accept="image/*" onChange={handleProfilePicUpload} />
+                  </label>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Nama Tampilan</label>
+                <input 
+                  type="text" 
+                  value={userProfile.name}
+                  onChange={(e) => setUserProfile({...userProfile, name: e.target.value})}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500"
+                  placeholder="Nama Anda"
+                />
+              </div>
+
+              {profileUpdateStatus && (
+                <div className={`p-3 rounded-lg text-sm text-center ${profileUpdateStatus.includes("Gagal") ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}>
+                  {profileUpdateStatus}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="px-5 py-2.5 text-sm font-medium text-neutral-400 hover:text-white transition-colors"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2.5 text-sm font-bold bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-colors"
+                >
+                  Simpan Profil
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {isSettingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-300 relative">
@@ -458,6 +579,154 @@ export default function Dashboard() {
                     onChange={(e) => setWebConfig({...webConfig, heroDesc: e.target.value})}
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500 resize-none"
                   />
+                </div>
+                <div className="flex items-center justify-between bg-neutral-950 border border-neutral-800 p-4 rounded-xl">
+                  <div>
+                    <p className="text-sm font-medium text-white">Tampilkan Tombol Mulai Sekarang</p>
+                    <p className="text-xs text-neutral-500">Tombol di halaman utama ("Mulai Sekarang")</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={webConfig.heroButtonVisible !== false}
+                      onChange={(e) => setWebConfig({...webConfig, heroButtonVisible: e.target.checked})}
+                    />
+                    <div className="w-11 h-6 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Latar Belakang */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider">Latar Belakang Website</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Gambar Latar (URL/Upload)</label>
+                    <div className="flex gap-2">
+                       <input 
+                         type="text" 
+                         value={webConfig.bgImage || ""}
+                         onChange={(e) => setWebConfig({...webConfig, bgImage: e.target.value})}
+                         className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                         placeholder="https://..."
+                       />
+                       <label className="bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-xl cursor-pointer flex items-center justify-center transition-colors text-sm">
+                          <input 
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  if (event.target?.result) {
+                                    setWebConfig({...webConfig, bgImage: event.target.result as string});
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          Upload
+                       </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Warna Tema Latar</label>
+                    <div className="flex items-center gap-3">
+                       <input 
+                         type="color" 
+                         value={webConfig.bgColor || "#ffffff"}
+                         onChange={(e) => setWebConfig({...webConfig, bgColor: e.target.value})}
+                         className="w-10 h-10 rounded cursor-pointer bg-neutral-950 border border-neutral-800"
+                       />
+                       <button 
+                          onClick={() => setWebConfig({...webConfig, bgColor: ""})} 
+                          className="text-xs text-rose-400 hover:text-rose-300 transition-colors"
+                       >
+                         Reset ke Default
+                       </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cara Penggunaan */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider">Cara Penggunaan</h3>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <span className="text-xs text-neutral-400 mr-2">Tampilkan</span>
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={webConfig.howToUseVisible !== false}
+                      onChange={(e) => setWebConfig({...webConfig, howToUseVisible: e.target.checked})}
+                    />
+                    <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-neutral-400 mb-1 block">Judul Section</label>
+                    <input 
+                      type="text" 
+                      value={webConfig.howToUseTitle || ""}
+                      onChange={(e) => setWebConfig({...webConfig, howToUseTitle: e.target.value})}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                      placeholder="Cara Penggunaan"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-neutral-400 mb-1 block">Posisi Teks (Align)</label>
+                    <select
+                      value={webConfig.howToUseAlign || "center"}
+                      onChange={(e) => setWebConfig({...webConfig, howToUseAlign: e.target.value})}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="left">Kiri</option>
+                      <option value="center">Tengah</option>
+                      <option value="right">Kanan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-neutral-400 mb-1 block">Langkah 1</label>
+                    <input 
+                      type="text" 
+                      value={webConfig.howToUseStep1 || ""}
+                      onChange={(e) => setWebConfig({...webConfig, howToUseStep1: e.target.value})}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-neutral-400 mb-1 block">Langkah 2</label>
+                    <input 
+                      type="text" 
+                      value={webConfig.howToUseStep2 || ""}
+                      onChange={(e) => setWebConfig({...webConfig, howToUseStep2: e.target.value})}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-neutral-400 mb-1 block">Langkah 3</label>
+                    <input 
+                      type="text" 
+                      value={webConfig.howToUseStep3 || ""}
+                      onChange={(e) => setWebConfig({...webConfig, howToUseStep3: e.target.value})}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-neutral-400 mb-1 block">Langkah 4</label>
+                    <input 
+                      type="text" 
+                      value={webConfig.howToUseStep4 || ""}
+                      onChange={(e) => setWebConfig({...webConfig, howToUseStep4: e.target.value})}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -689,32 +958,49 @@ export default function Dashboard() {
                 {status === 'connected' ? 'Aktif' : status === 'connecting' ? 'Menyambungkan' : 'Terputus'}
               </span>
             </div>
-            <button 
-              onClick={() => { localStorage.removeItem("mock_user_email"); navigate("/"); }}
-              className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-4 py-2 rounded-full border border-rose-500/30 transition-colors"
-            >
-              <LogOut className="w-4 h-4" /> Keluar
-            </button>
-            {isAdmin && (
-              <div className="relative z-50">
-                <button 
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  className="p-2 bg-neutral-950 border border-neutral-800 hover:bg-neutral-800 rounded-full transition-colors text-neutral-400 hover:text-white"
-                >
-                  <MoreVertical className="w-5 h-5" />
-                </button>
-                {showDropdown && (
-                  <div className="absolute right-0 mt-2 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl overflow-hidden">
+            <div className="relative z-50">
+              <button 
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="flex items-center gap-2 p-1.5 bg-neutral-950 border border-neutral-800 hover:bg-neutral-800 rounded-full transition-colors text-white"
+              >
+                {userProfile.photo ? (
+                  <img src={userProfile.photo} className="w-8 h-8 rounded-full object-cover" alt="Profile" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+                    {(userProfile.name || currentUserEmail || "U")[0].toUpperCase()}
+                  </div>
+                )}
+                <MoreVertical className="w-5 h-5 text-neutral-400 mr-1" />
+              </button>
+              {showDropdown && (
+                <div className="absolute right-0 mt-2 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl overflow-hidden py-2" style={{zIndex: 100}}>
+                  <div className="px-4 py-2 border-b border-neutral-800 mb-2">
+                    <p className="text-white text-sm font-semibold truncate">{userProfile.name || "Pengguna"}</p>
+                    <p className="text-neutral-500 text-xs truncate">{currentUserEmail}</p>
+                  </div>
+                  <button 
+                    onClick={() => { setIsProfileOpen(true); setShowDropdown(false); }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors flex items-center gap-3"
+                  >
+                    <Users className="w-4 h-4" /> Edit Profile
+                  </button>
+                  {isAdmin && (
                     <button 
                       onClick={() => { setIsSettingsOpen(true); setShowDropdown(false); }}
-                      className="w-full text-left px-4 py-3 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors flex items-center gap-3"
+                      className="w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors flex items-center gap-3"
                     >
                       <Settings className="w-4 h-4" /> Edit Landing Page
                     </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                  <button 
+                    onClick={() => { localStorage.removeItem("mock_user_email"); navigate("/"); }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-rose-400 hover:bg-neutral-800 transition-colors flex items-center gap-3"
+                  >
+                    <LogOut className="w-4 h-4" /> Keluar
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
