@@ -538,10 +538,10 @@ export default function Landing() {
               ✕
             </button>
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2 text-center">
-              {isRegisterMode ? "Buat Akun Baru" : webConfig.loginTitle || "Selamat Datang"}
+              {isRegisterMode ? webConfig.registerTitle || "Buat Akun Baru" : webConfig.loginTitle || "Selamat Datang"}
             </h2>
             <p className="text-neutral-600 dark:text-neutral-400 text-center mb-8 text-sm">
-              {isRegisterMode ? "Daftar untuk mengakses dasbor WabotPro" : webConfig.loginSubtitle || "Masuk ke dasbor WabotPro Anda"}
+              {isRegisterMode ? webConfig.registerSubtitle || "Daftar untuk mengakses dasbor WabotPro" : webConfig.loginSubtitle || "Masuk ke dasbor WabotPro Anda"}
             </p>
 
             {error && (
@@ -552,54 +552,48 @@ export default function Landing() {
 
             <form onSubmit={handleEmailAuth} className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">{webConfig.loginEmailParam || "Email"}</label>
+                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">
+                  {isRegisterMode ? webConfig.registerEmailParam || "Email" : webConfig.loginEmailParam || "Email"}
+                </label>
                 <input 
                   type="email" 
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-neutral-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                  placeholder={webConfig.loginEmailPlaceholder || "nama@email.com"}
+                  placeholder={isRegisterMode ? webConfig.registerEmailPlaceholder || "nama@email.com" : webConfig.loginEmailPlaceholder || "nama@email.com"}
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">{webConfig.loginPasswordParam || "Password"}</label>
+                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">
+                  {isRegisterMode ? webConfig.registerPasswordParam || "Password" : webConfig.loginPasswordParam || "Password"}
+                </label>
                 <input 
                   type="password" 
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-neutral-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                  placeholder={webConfig.loginPasswordPlaceholder || "••••••••"}
+                  placeholder={isRegisterMode ? webConfig.registerPasswordPlaceholder || "••••••••" : webConfig.loginPasswordPlaceholder || "••••••••"}
                 />
               </div>
               <button 
                 type="submit"
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-neutral-950 font-bold py-3 rounded-xl transition-colors mt-2"
               >
-                {isRegisterMode ? "Daftar" : webConfig.loginButtonText || "Masuk"}
+                {isRegisterMode ? webConfig.registerButtonText || "Daftar" : webConfig.loginButtonText || "Masuk"}
               </button>
             </form>
 
-            <p className="text-center text-sm text-neutral-500 mt-6">
-              {isRegisterMode ? "Sudah punya akun? " : webConfig.loginRegisterText || "Belum punya akun? Daftar"}
-              {isRegisterMode && (
-                <button 
-                  onClick={() => setIsRegisterMode(!isRegisterMode)}
-                  className="text-emerald-400 hover:text-emerald-300 font-medium ml-1"
-                >
-                  Masuk
-                </button>
-              )}
-              {!isRegisterMode && (!webConfig.loginRegisterText || webConfig.loginRegisterText.toLowerCase() === "belum punya akun? daftar") && (
-                <button 
-                  onClick={() => setIsRegisterMode(!isRegisterMode)}
-                  className="text-emerald-400 hover:text-emerald-300 font-medium ml-1"
-                >
-                  Daftar
-                </button>
-              )}
-            </p>
+            <div className="text-center mt-6">
+              <button 
+                type="button"
+                onClick={() => setIsRegisterMode(!isRegisterMode)}
+                className="text-sm text-emerald-500 hover:text-emerald-400 font-medium transition-colors"
+              >
+                {isRegisterMode ? webConfig.registerLoginText || "Sudah punya akun? Masuk" : webConfig.loginRegisterText || "Belum punya akun? Daftar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

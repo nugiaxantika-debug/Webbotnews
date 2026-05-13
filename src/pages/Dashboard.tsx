@@ -161,6 +161,14 @@ export default function Dashboard() {
     loginPasswordPlaceholder: "••••••••",
     loginButtonText: "Masuk",
     loginRegisterText: "Belum punya akun? Daftar",
+    registerTitle: "Buat Akun Baru",
+    registerSubtitle: "Daftar untuk mengakses dasbor WabotPro",
+    registerEmailParam: "Email",
+    registerEmailPlaceholder: "nama@email.com",
+    registerPasswordParam: "Password",
+    registerPasswordPlaceholder: "••••••••",
+    registerButtonText: "Daftar",
+    registerLoginText: "Sudah punya akun? Masuk",
     adEnabled: false,
     adMedia: "",
     adMediaType: "image",
@@ -1076,6 +1084,41 @@ export default function Dashboard() {
                   <div>
                     <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Teks Switch Belum Punya Akun</label>
                     <input type="text" value={webConfig.loginRegisterText} onChange={(e) => setWebConfig({...webConfig, loginRegisterText: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div className="col-span-2 mt-2">
+                    <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Halaman Register</h4>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Judul Halaman (Register)</label>
+                    <input type="text" value={webConfig.registerTitle} onChange={(e) => setWebConfig({...webConfig, registerTitle: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Sub Judul (Register)</label>
+                    <input type="text" value={webConfig.registerSubtitle} onChange={(e) => setWebConfig({...webConfig, registerSubtitle: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Label Email (Register)</label>
+                    <input type="text" value={webConfig.registerEmailParam} onChange={(e) => setWebConfig({...webConfig, registerEmailParam: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Placeholder Email (Register)</label>
+                    <input type="text" value={webConfig.registerEmailPlaceholder} onChange={(e) => setWebConfig({...webConfig, registerEmailPlaceholder: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Label Password (Register)</label>
+                    <input type="text" value={webConfig.registerPasswordParam} onChange={(e) => setWebConfig({...webConfig, registerPasswordParam: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Placeholder Password (Register)</label>
+                    <input type="text" value={webConfig.registerPasswordPlaceholder} onChange={(e) => setWebConfig({...webConfig, registerPasswordPlaceholder: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Teks Tombol Daftar</label>
+                    <input type="text" value={webConfig.registerButtonText} onChange={(e) => setWebConfig({...webConfig, registerButtonText: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Teks Switch Sudah Punya Akun</label>
+                    <input type="text" value={webConfig.registerLoginText} onChange={(e) => setWebConfig({...webConfig, registerLoginText: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500" />
                   </div>
                 </div>
               </div>
