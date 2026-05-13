@@ -351,14 +351,74 @@ async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "custom",
     });
     app.use(vite.middlewares);
+    
+    app.get("*", async (req, res, next) => {
+      try {
+        const url = req.originalUrl;
+        let template = fs.readFileSync(path.resolve(process.cwd(), "index.html"), "utf-8");
+        template = await vite.transformIndexHtml(url, template);
+
+        let config: any = {};
+        try {
+          const docSnap = await getDoc(doc(adminDb, "settings", "web_config"));
+          if (docSnap.exists()) {
+            config = docSnap.data() || {};
+          } else if (fs.existsSync("web_config.json")) {
+            config = JSON.parse(fs.readFileSync("web_config.json", "utf-8"));
+          }
+        } catch(e) {}
+
+        if (config.title) {
+          const fullTitle = `${config.title}${config.highlight ? ' ' + config.highlight : ''}`;
+          template = template.replace(/<title>.*?<\/title>/, `<title>${fullTitle}</title>`);
+          
+          let headInject = `<meta name="description" content="${config.heroDesc || fullTitle}">\n  <meta property="og:title" content="${fullTitle}">\n  <meta property="og:description" content="${config.heroDesc || fullTitle}">`;
+          if (config.favicon) {
+            headInject += `\n  <link rel="icon" href="${config.favicon}">`;
+          }
+          template = template.replace('</head>', `${headInject}\n  </head>`);
+        }
+
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    app.use(express.static(distPath, { index: false }));
+    app.get("*", async (req, res) => {
+      try {
+        let template = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
+        
+        let config: any = {};
+        try {
+          const docSnap = await getDoc(doc(adminDb, "settings", "web_config"));
+          if (docSnap.exists()) {
+            config = docSnap.data() || {};
+          } else if (fs.existsSync("web_config.json")) {
+            config = JSON.parse(fs.readFileSync("web_config.json", "utf-8"));
+          }
+        } catch(e) {}
+
+        if (config.title) {
+          const fullTitle = `${config.title}${config.highlight ? ' ' + config.highlight : ''}`;
+          template = template.replace(/<title>.*?<\/title>/i, `<title>${fullTitle}</title>`);
+          
+          let headInject = `<meta name="description" content="${config.heroDesc || fullTitle}">\n  <meta property="og:title" content="${fullTitle}">\n  <meta property="og:description" content="${config.heroDesc || fullTitle}">`;
+          if (config.favicon) {
+            headInject += `\n  <link rel="icon" href="${config.favicon}">`;
+          }
+          template = template.replace('</head>', `${headInject}\n  </head>`);
+        }
+        res.status(200).set({ 'Content-Type': 'text/html' }).send(template);
+      } catch (e) {
+        res.sendFile(path.join(distPath, "index.html"));
+      }
     });
   }
 
