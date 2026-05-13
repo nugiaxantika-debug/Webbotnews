@@ -7,11 +7,15 @@ import { Server as SocketIOServer } from "socket.io";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { WhatsAppBot } from "./src/services/whatsapp";
-
-
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, doc, getDoc, setDoc, getDocs, getCountFromServer } from "firebase/firestore";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
+const adminApp = initializeApp(firebaseConfig);
+const adminDb = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
 
 process.on('uncaughtException', (err) => {
   console.error("Uncaught Exception:", err);
@@ -85,43 +89,79 @@ async function startServer() {
       if (fs.existsSync("auth.json")) {
         users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
       }
+      const snapshot = await getDocs(collection(adminDb, "users"));
+      users.push(...snapshot.docs.map(doc => doc.data()));
     } catch(e){}
+    
     if (users.find(u => u.email === email)) {
       return res.status(400).json({ error: "Email sudah terdaftar" });
     }
-    users.push({ email, password });
-    fs.writeFileSync("auth.json", JSON.stringify(users, null, 2));
+    
+    const newUser = { email, password, name: "", photo: "" };
+    
+    try {
+        await setDoc(doc(adminDb, "users", email), newUser);
+    } catch (e) {}
+
+    // keep local array sync for existing logic
+    let localUsers: any[] = [];
+    if (fs.existsSync("auth.json")) {
+      localUsers = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+    }
+    localUsers.push(newUser);
+    fs.writeFileSync("auth.json", JSON.stringify(localUsers, null, 2));
     
     res.json({ success: true, email });
   });
 
-  app.post("/api/auth/login", (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     const { email, password } = req.body;
-    let users: any[] = [];
+    let user = null;
     try {
-      if (fs.existsSync("auth.json")) {
-        users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
-      }
-    } catch(e){}
-    const user = users.find(u => u.email === email && u.password === password);
+       const userDoc = await getDoc(doc(adminDb, "users", email));
+       if (userDoc.exists()) {
+         user = userDoc.data();
+       }
+    } catch(e) {}
+
     if (!user) {
+      let users: any[] = [];
+      try {
+        if (fs.existsSync("auth.json")) {
+          users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+        }
+      } catch(e){}
+      user = users.find(u => u.email === email);
+    }
+
+    if (!user || user.password !== password) {
       return res.status(401).json({ error: "Email atau password salah." });
     }
     res.json({ success: true, email });
   });
 
-  app.get("/api/user/profile", (req, res) => {
+  app.get("/api/user/profile", async (req, res) => {
     const email = req.headers["x-user-email"] as string;
     if (!email) return res.status(401).json({ error: "Unauthorized" });
 
-    let users: any[] = [];
+    let user = null;
     try {
-      if (fs.existsSync("auth.json")) {
-        users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
-      }
-    } catch(e){}
-    
-    const user = users.find(u => u.email === email);
+       const userDoc = await getDoc(doc(adminDb, "users", email));
+       if (userDoc.exists()) {
+         user = userDoc.data();
+       }
+    } catch(e) {}
+
+    if (!user) {
+        let users: any[] = [];
+        try {
+          if (fs.existsSync("auth.json")) {
+            users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+          }
+        } catch(e){}
+        user = users.find(u => u.email === email);
+    }
+
     if (!user) return res.status(404).json({ error: "Not found" });
 
     res.json({ name: user.name || "", photo: user.photo || "" });
@@ -132,6 +172,12 @@ async function startServer() {
     if (!email) return res.status(401).json({ error: "Unauthorized" });
 
     const { name, photo } = req.body;
+    
+    try {
+        await setDoc(doc(adminDb, "users", email), { name, photo }, { merge: true });
+    } catch (e) {}
+
+    // keep local sync
     let users: any[] = [];
     try {
       if (fs.existsSync("auth.json")) {
@@ -144,30 +190,24 @@ async function startServer() {
       if (name !== undefined) users[userIdx].name = name;
       if (photo !== undefined) users[userIdx].photo = photo;
       fs.writeFileSync("auth.json", JSON.stringify(users, null, 2));
-
-      /*
-      if (adminDb) {
-        try {
-          await adminDb.collection("users").doc(email).set({ name, photo }, { merge: true });
-        } catch(e) {}
-      }
-      */
-      // (The above could be uncommented if we restore adminDb logic later, but for now we write locally)
-
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ error: "Not found" });
     }
+    
+    res.json({ success: true });
   });
 
-  app.get("/api/users/count", (req, res) => {
-    let users: any[] = [];
+  app.get("/api/users/count", async (req, res) => {
     try {
-      if (fs.existsSync("auth.json")) {
-        users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
-      }
-    } catch(e){}
-    res.json({ count: users.length });
+       const snapshot = await getCountFromServer(collection(adminDb, "users"));
+       res.json({ count: snapshot.data().count });
+    } catch (e) {
+       let users: any[] = [];
+       try {
+         if (fs.existsSync("auth.json")) {
+           users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+         }
+       } catch(e){}
+       res.json({ count: users.length });
+    }
   });
 
   app.get("/api/bots/active", (req, res) => {
@@ -183,7 +223,11 @@ async function startServer() {
   app.get("/api/config", async (req, res) => {
     let config = {};
     try {
-      if (fs.existsSync("web_config.json")) {
+      const docSnap = await getDoc(doc(adminDb, "settings", "web_config"));
+      if (docSnap.exists()) {
+        config = docSnap.data() || {};
+      } else if (fs.existsSync("web_config.json")) {
+        // Fallback to local if not initialized
         config = JSON.parse(fs.readFileSync("web_config.json", "utf-8"));
       }
     } catch(e){}
@@ -192,7 +236,11 @@ async function startServer() {
 
   app.post("/api/config", async (req, res) => {
     try {
-      fs.writeFileSync("web_config.json", JSON.stringify(req.body.config, null, 2));
+      if (req.body.config) {
+        await setDoc(doc(adminDb, "settings", "web_config"), req.body.config, { merge: true });
+        // Also write to local just in case
+        fs.writeFileSync("web_config.json", JSON.stringify(req.body.config, null, 2));
+      }
       res.json({ success: true });
     } catch(e: any) {
       res.status(500).json({ error: e.message });

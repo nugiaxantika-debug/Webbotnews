@@ -59,8 +59,61 @@ export default function Landing() {
     loginPasswordParam: "Password",
     loginPasswordPlaceholder: "••••••••",
     loginButtonText: "Masuk",
-    loginRegisterText: "Belum punya akun? Daftar"
+    loginRegisterText: "Belum punya akun? Daftar",
+    adEnabled: false,
+    adMedia: "",
+    adMediaType: "image",
+    adLink: "",
+    adCooldownDays: 1,
+    floatingChatEnabled: false,
+    floatingChatIcon: "",
+    floatingChatText: "Chat",
+    chatbotWelcomeMessage: "Halo! Ada yang bisa kami bantu? 👋",
+    chatbotQuickReplies: []
   });
+
+  const [showAd, setShowAd] = useState(false);
+  const [adDismissed, setAdDismissed] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{role: 'user'|'bot', content: string, isTemp?: boolean}[]>([]);
+  const [isChatTyping, setIsChatTyping] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  const toggleChat = () => {
+      if (!isChatOpen && chatMessages.length === 0) {
+          setChatMessages([{ role: 'bot', content: webConfig.chatbotWelcomeMessage || "Halo! Ada yang bisa kami bantu? 👋" }]);
+          setShowQuickReplies(true);
+      }
+      setIsChatOpen(!isChatOpen);
+  };
+
+  const handleQuickReply = (qr: any) => {
+      setShowQuickReplies(false);
+      const userMessage = qr.text;
+      
+      const updatedMessages = [...chatMessages, { role: 'user' as const, content: userMessage }];
+      setChatMessages(updatedMessages);
+      setIsChatTyping(true);
+
+      setTimeout(() => {
+          setChatMessages(prev => [...prev, { 
+              role: 'bot', 
+              content: qr.reply || "Maaf, balasan belum diatur." 
+          }]);
+          setIsChatTyping(false);
+          setTimeout(() => {
+              setShowQuickReplies(true);
+          }, 1000);
+      }, 1000);
+  };
+
+  useEffect(() => {
+      if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+  }, [chatMessages, isChatOpen]);
 
   useEffect(() => {
     const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
@@ -69,6 +122,26 @@ export default function Landing() {
       .then(data => {
         if (data.config && Object.keys(data.config).length > 0) {
           setWebConfig(prev => ({ ...prev, ...data.config }));
+          if (data.config.adEnabled && data.config.adMedia && !adDismissed) {
+             const cooldownDays = data.config.adCooldownDays !== undefined ? parseFloat(data.config.adCooldownDays) : 1;
+             
+             let shouldShow = true;
+             if (cooldownDays > 0) {
+                 const lastDismissed = localStorage.getItem('ad_dismissed_at');
+                 if (lastDismissed) {
+                     const dismissedAt = new Date(parseInt(lastDismissed, 10)).getTime();
+                     const now = new Date().getTime();
+                     const daysPassed = (now - dismissedAt) / (1000 * 60 * 60 * 24);
+                     if (daysPassed < cooldownDays) {
+                         shouldShow = false;
+                     }
+                 }
+             }
+             
+             if (shouldShow) {
+                setShowAd(true);
+             }
+          }
         }
       })
       .catch(console.error);
@@ -328,7 +401,129 @@ export default function Landing() {
         </div>
       </footer>
 
+      {/* Floating Chat Bubble */}
+      {webConfig.floatingChatEnabled && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
+          {/* Chat Window */}
+          {isChatOpen && (
+            <div 
+              style={{
+                width: webConfig.chatBoxWidth ? `${webConfig.chatBoxWidth}px` : '350px',
+                height: webConfig.chatBoxHeight ? `${webConfig.chatBoxHeight}px` : '450px',
+              }}
+              className="max-w-[calc(100vw-3rem)] max-h-[calc(100vh-8rem)] bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl flex flex-col pointer-events-auto overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300"
+            >
+              {/* Header */}
+              <div className="bg-emerald-500 p-4 text-white flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  {webConfig.floatingChatIcon ? (
+                     <img src={webConfig.floatingChatIcon} alt="Chat Icon" className="w-8 h-8 rounded-full object-cover bg-white" />
+                  ) : (
+                     <MessageCircle className="w-6 h-6" />
+                  )}
+                  <h3 className="font-semibold">{webConfig.floatingChatText || "Chat AI"}</h3>
+                </div>
+                <button onClick={toggleChat} className="text-white hover:text-white/80 transition" aria-label="Close chat">
+                  <span className="text-xl leading-none">&times;</span>
+                </button>
+              </div>
+              
+              {/* Messages Area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-neutral-50 dark:bg-neutral-950">
+                {chatMessages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-emerald-500 text-white rounded-br-sm' : 'bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 rounded-bl-sm shadow-sm'}`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {isChatTyping && (
+                  <div className="flex justify-start">
+                    <div className="rounded-2xl px-4 py-3 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-bl-sm shadow-sm flex gap-1">
+                      <div className="w-2 h-2 rounded-full bg-neutral-400 animate-bounce delay-100"></div>
+                      <div className="w-2 h-2 rounded-full bg-neutral-400 animate-bounce delay-200"></div>
+                      <div className="w-2 h-2 rounded-full bg-neutral-400 animate-bounce delay-300"></div>
+                    </div>
+                  </div>
+                )}
+                {showQuickReplies && webConfig.chatbotQuickReplies && webConfig.chatbotQuickReplies.length > 0 && !isChatTyping && (
+                  <div className="flex flex-col items-start gap-2 pt-2">
+                    {webConfig.chatbotQuickReplies.map((qr: any, idx: number) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleQuickReply(qr)}
+                        className="text-sm bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-50 dark:hover:bg-neutral-700 px-4 py-2 rounded-2xl rounded-bl-sm transition text-left shadow-sm w-fit max-w-[80%]"
+                      >
+                        {qr.text}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+          )}
+
+          {/* Toggle Button */}
+          {!isChatOpen && (
+            <button
+              onClick={toggleChat}
+              className="flex items-center gap-3 bg-emerald-50 dark:bg-neutral-800 p-3 pr-4 rounded-full shadow-lg border border-emerald-100 dark:border-neutral-700 hover:scale-105 transition-transform duration-200 group pointer-events-auto"
+            >
+              {webConfig.floatingChatIcon ? (
+                <img src={webConfig.floatingChatIcon} alt="Chat Icon" className="w-10 h-10 rounded-full object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white relative">
+                  <span className="absolute flex h-full w-full">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-20"></span>
+                  </span>
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+              )}
+              {webConfig.floatingChatText && (
+                <span className="text-sm font-semibold text-emerald-800 dark:text-neutral-200">
+                  {webConfig.floatingChatText}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Auth Modal */}
+      {/* Ad Modal */}
+      {showAd && webConfig.adMedia && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="relative max-w-2xl w-full bg-neutral-900 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <button 
+              onClick={() => { 
+                  setShowAd(false); 
+                  setAdDismissed(true); 
+                  localStorage.setItem('ad_dismissed_at', new Date().getTime().toString());
+              }}
+              className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center bg-black/50 hover:bg-black/80 text-white rounded-full transition-colors"
+            >
+              &times;
+            </button>
+            <a 
+               href={webConfig.adLink || "#"} 
+               target={webConfig.adLink ? "_blank" : "_self"} 
+               rel="noreferrer"
+               className={webConfig.adLink ? "cursor-pointer" : "cursor-default pointer-events-none"}
+               onClick={(e) => {
+                 if (!webConfig.adLink) e.preventDefault();
+               }}
+            >
+              {webConfig.adMediaType === 'video' ? (
+                <video src={webConfig.adMedia} autoPlay loop muted playsInline className="w-full max-h-[80vh] object-contain bg-black" />
+              ) : (
+                <img src={webConfig.adMedia} alt="Promo" className="w-full max-h-[80vh] object-contain bg-black" />
+              )}
+            </a>
+          </div>
+        </div>
+      )}
+
       {isLoginModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-500/80 dark:bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200 relative">

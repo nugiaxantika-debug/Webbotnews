@@ -160,7 +160,17 @@ export default function Dashboard() {
     loginPasswordParam: "Password",
     loginPasswordPlaceholder: "••••••••",
     loginButtonText: "Masuk",
-    loginRegisterText: "Belum punya akun? Daftar"
+    loginRegisterText: "Belum punya akun? Daftar",
+    adEnabled: false,
+    adMedia: "",
+    adMediaType: "image",
+    adLink: "",
+    adCooldownDays: 1,
+    floatingChatEnabled: false,
+    floatingChatIcon: "",
+    floatingChatText: "Chat",
+    chatbotWelcomeMessage: "Halo! Ada yang bisa kami bantu? 👋",
+    chatbotQuickReplies: []
   });
 
   useEffect(() => {
@@ -653,6 +663,92 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* Pengaturan Iklan (Landing Page) */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider">Pengaturan Iklan (Landing Page)</h3>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <span className="text-xs text-neutral-400 mr-2">Aktifkan Iklan</span>
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={webConfig.adEnabled === true}
+                      onChange={(e) => setWebConfig({...webConfig, adEnabled: e.target.checked})}
+                    />
+                    <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+                {webConfig.adEnabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="col-span-1 md:col-span-2">
+                       <label className="text-sm font-medium text-neutral-400 mb-1.5 block">File Iklan Gambar/Video (URL / Upload)</label>
+                       <div className="flex gap-2">
+                         <input 
+                           type="text" 
+                           value={webConfig.adMedia || ""}
+                           onChange={(e) => setWebConfig({...webConfig, adMedia: e.target.value})}
+                           className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                           placeholder="https://... atau upload file"
+                         />
+                         <label className="bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-xl cursor-pointer flex items-center justify-center transition-colors text-sm whitespace-nowrap">
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*,video/*" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    if (event.target?.result) {
+                                      setWebConfig({...webConfig, adMedia: event.target.result as string, adMediaType: file.type.startsWith('video/') ? 'video' : 'image'});
+                                    }
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            Upload
+                         </label>
+                       </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Tipe Media Iklan</label>
+                      <select
+                        value={webConfig.adMediaType || "image"}
+                        onChange={(e) => setWebConfig({...webConfig, adMediaType: e.target.value})}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="image">Gambar</option>
+                        <option value="video">Video</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Link Tujuan (Opsional)</label>
+                      <input 
+                        type="text" 
+                        value={webConfig.adLink || ""}
+                        onChange={(e) => setWebConfig({...webConfig, adLink: e.target.value})}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Durasi Muncul (Hari)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={webConfig.adCooldownDays !== undefined ? webConfig.adCooldownDays : 1}
+                        onChange={(e) => setWebConfig({...webConfig, adCooldownDays: parseFloat(e.target.value) || 0})}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                        placeholder="1"
+                      />
+                      <p className="text-xs text-neutral-500 mt-1">Isi 0 jika ingin selalu muncul. Jika 1, iklan tidak muncul selama 1 hari setelah ditutup.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Cara Penggunaan */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -812,6 +908,137 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Balon Obrolan (Floating Chat) */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider">Balon Obrolan (Pojok Kanan Bawah)</h3>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <span className="text-xs text-neutral-400 mr-2">Tampilkan</span>
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={webConfig.floatingChatEnabled === true}
+                      onChange={(e) => setWebConfig({...webConfig, floatingChatEnabled: e.target.checked})}
+                    />
+                    <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+                {webConfig.floatingChatEnabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="col-span-1 md:col-span-2">
+                       <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Icon/Logo (URL atau Upload)</label>
+                       <div className="flex gap-2">
+                         <input 
+                           type="text" 
+                           value={webConfig.floatingChatIcon || ""}
+                           onChange={(e) => setWebConfig({...webConfig, floatingChatIcon: e.target.value})}
+                           className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                           placeholder="https://..."
+                         />
+                         <label className="bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-xl cursor-pointer flex items-center justify-center transition-colors text-sm whitespace-nowrap">
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    if (event.target?.result) {
+                                      setWebConfig({...webConfig, floatingChatIcon: event.target.result as string});
+                                    }
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            Upload
+                         </label>
+                       </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Teks Tombol Chat</label>
+                      <input 
+                        type="text" 
+                        value={webConfig.floatingChatText || "Hubungi Kami"}
+                        onChange={(e) => setWebConfig({...webConfig, floatingChatText: e.target.value})}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Lebar Kotak Chat (px) - Opsional</label>
+                      <input 
+                        type="number" 
+                        value={webConfig.chatBoxWidth || 350}
+                        onChange={(e) => setWebConfig({...webConfig, chatBoxWidth: parseInt(e.target.value) || 350})}
+                        placeholder="350"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Tinggi Kotak Chat (px) - Opsional</label>
+                      <input 
+                        type="number" 
+                        value={webConfig.chatBoxHeight || 450}
+                        onChange={(e) => setWebConfig({...webConfig, chatBoxHeight: parseInt(e.target.value) || 450})}
+                        placeholder="450"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div className="col-span-1 md:col-span-2">
+                       <div className="flex justify-between items-center mb-1.5">
+                         <label className="text-sm font-medium text-neutral-400 block">Tombol Quick Reply (Tanya Jawab Cepat)</label>
+                         <button 
+                           onClick={() => setWebConfig({...webConfig, chatbotQuickReplies: [...(webConfig.chatbotQuickReplies || []), { text: '', reply: '' }]})}
+                           className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded hover:bg-indigo-500/30"
+                         >
+                           + Tambah
+                         </button>
+                       </div>
+                       {(webConfig.chatbotQuickReplies || []).map((qr: any, idx: number) => (
+                         <div key={idx} className="flex gap-2 mb-2">
+                           <div className="flex-1 space-y-2">
+                             <input 
+                               type="text" 
+                               value={qr.text}
+                               onChange={(e) => {
+                                 const newQRs = [...webConfig.chatbotQuickReplies];
+                                 newQRs[idx].text = e.target.value;
+                                 setWebConfig({...webConfig, chatbotQuickReplies: newQRs});
+                               }}
+                               placeholder="Teks Tombol (Misal: Harga?)"
+                               className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"
+                             />
+                             <textarea 
+                               value={qr.reply}
+                               onChange={(e) => {
+                                 const newQRs = [...webConfig.chatbotQuickReplies];
+                                 newQRs[idx].reply = e.target.value;
+                                 setWebConfig({...webConfig, chatbotQuickReplies: newQRs});
+                               }}
+                               placeholder="Teks Balasan Otomatis"
+                               rows={2}
+                               className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none resize-none"
+                             />
+                           </div>
+                           <button 
+                             onClick={() => {
+                               const newQRs = [...webConfig.chatbotQuickReplies];
+                               newQRs.splice(idx, 1);
+                               setWebConfig({...webConfig, chatbotQuickReplies: newQRs});
+                             }}
+                             className="bg-red-500/10 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-500/20 h-fit"
+                           >
+                             Hapus
+                           </button>
+                         </div>
+                       ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
