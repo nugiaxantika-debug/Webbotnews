@@ -175,7 +175,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
-    fetch(`${apiBaseURL}/api/config`)
+    fetch(`${apiBaseURL}/api/config?t=${Date.now()}`)
       .then(res => res.json())
       .then(data => {
         if (data.config && Object.keys(data.config).length > 0) {

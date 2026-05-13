@@ -221,6 +221,11 @@ async function startServer() {
   });
 
   app.get("/api/config", async (req, res) => {
+    // Disable caching for configuration completely
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     let config = {};
     try {
       const docSnap = await getDoc(doc(adminDb, "settings", "web_config"));
@@ -230,7 +235,15 @@ async function startServer() {
         // Fallback to local if not initialized
         config = JSON.parse(fs.readFileSync("web_config.json", "utf-8"));
       }
-    } catch(e){}
+    } catch(e) {
+      console.error("Error reading config:", e);
+      // Fallback to local if Firebase fails
+      if (fs.existsSync("web_config.json")) {
+        try {
+          config = JSON.parse(fs.readFileSync("web_config.json", "utf-8"));
+        } catch(err) {}
+      }
+    }
     res.json({ config });
   });
 
