@@ -382,7 +382,12 @@ async function startServer() {
           template = template.replace('</head>', `${headInject}\n  </head>`);
         }
 
-        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        res.status(200).set({ 
+          'Content-Type': 'text/html',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }).end(template);
       } catch (e: any) {
         vite.ssrFixStacktrace(e);
         next(e);
@@ -415,9 +420,18 @@ async function startServer() {
           }
           template = template.replace('</head>', `${headInject}\n  </head>`);
         }
-        res.status(200).set({ 'Content-Type': 'text/html' }).send(template);
+        res.status(200).set({ 
+          'Content-Type': 'text/html',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }).send(template);
       } catch (e) {
-        res.sendFile(path.join(distPath, "index.html"));
+        res.status(200).set({
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }).sendFile(path.join(distPath, "index.html"));
       }
     });
   }

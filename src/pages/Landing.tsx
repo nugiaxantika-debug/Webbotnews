@@ -115,6 +115,8 @@ export default function Landing() {
       }
   }, [chatMessages, isChatOpen]);
 
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+
   useEffect(() => {
     const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
     fetch(`${apiBaseURL}/api/config?t=${Date.now()}`)
@@ -143,11 +145,13 @@ export default function Landing() {
              }
           }
         }
+        setIsConfigLoaded(true);
       })
-      .catch(console.error);
+      .catch(() => setIsConfigLoaded(true));
   }, []);
 
   useEffect(() => {
+    if (!isConfigLoaded) return;
     if (webConfig.favicon) {
       let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
       if (!link) {
@@ -157,8 +161,8 @@ export default function Landing() {
       }
       link.href = webConfig.favicon;
     }
-    document.title = `${webConfig.title}${webConfig.highlight}`;
-  }, [webConfig]);
+    document.title = `${webConfig.title}${webConfig.highlight ? ' ' + webConfig.highlight : ''}`;
+  }, [webConfig, isConfigLoaded]);
 
   useEffect(() => {
     const userEmail = localStorage.getItem("mock_user_email");
