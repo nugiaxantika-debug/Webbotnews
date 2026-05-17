@@ -15,6 +15,9 @@ import NodeCache from "node-cache";
 import sharp from "sharp";
 import axios from "axios";
 import schedule from "node-schedule";
+import { igdl, fbdl, ytmp4, ytmp3 } from "ruhend-scraper";
+import btch from "btch-downloader";
+import ab from "ab-downloader";
 
 const AUTH_FOLDER = path.join(process.cwd(), "auth_info_baileys");
 const msgRetryCounterCache = new NodeCache();
@@ -30,7 +33,10 @@ export class WhatsAppBot {
   private currentQr: string | null = null;
   private isAttemptingStart: boolean = false;
   private coverImageBuffer: Buffer | null = null;
-  private activeGames = new Map<string, { answer: string | string[] | number, type: string, attempts?: number }>();
+  private customBotName: string | null = null;
+  private poweredByText: string | null = null;
+  private menuCommands = new Set<string>(["allmenu", "menu", "help", "bot"]);
+  private activeGames = new Map<string, { answer: string | string[] | number, type: string, attempts?: number, state?: string, players?: string[] }>();
   private activeSwGroups = new Set<string>();
   
   // Anti features
@@ -40,13 +46,15 @@ export class WhatsAppBot {
   private antiStikerGroups = new Set<string>();
   private antiSpamGroups = new Set<string>();
   private antiTagSwGroups = new Set<string>();
+  private antiVirtexGroups = new Set<string>();
+  private antiToxicGroups = new Set<string>();
   
   private autoTypingEnabled: boolean = false;
   private groupSettings = new Map<string, { welcomeEnabled?: boolean, welcomeMessage?: string, goodbyeEnabled?: boolean, goodbyeMessage?: string }>();
   
   private connectedAt: number | null = null;
   
-  // Anti spam tracking
+  private storedStickers = new Map<string, Buffer>();
   private userMessageHistory = new Map<string, { text: string, time: number, count: number }>();
 
   private connectionMonitor: any = null;
@@ -588,6 +596,20 @@ export class WhatsAppBot {
         reason = "antitagsw";
       }
 
+      if (this.antiVirtexGroups.has(jid) && textInfo && textInfo.length > 5000) {
+        shouldDelete = true;
+        reason = "antivirtex";
+      }
+
+      const toxicWords = ["anjing", "babi", "bangsat", "kontol", "memek", "jembut", "ngentot", "tolol", "goblok"];
+      if (this.antiToxicGroups.has(jid) && textInfo) {
+         const lowerText = textInfo.toLowerCase();
+         if (toxicWords.some(w => lowerText.includes(w))) {
+            shouldDelete = true;
+            reason = "antitoxic";
+         }
+      }
+
       if (this.antiSpamGroups.has(jid) && textInfo && participant) {
         // very rudimentary spam tracking: if same user sends to same group repeatedly fast
         const key = `${jid}-${participant}`;
@@ -684,8 +706,13 @@ export class WhatsAppBot {
     const isGroup = jid.endsWith("@g.us");
     
     const requestedCmd = body.split(/[\s\n]+/)[0];
-    const ownerCommands = ['.ownermenu', 'ownermenu', '.broadcast', 'broadcast', '.restartbot', 'restartbot', '.addpremium', 'addpremium', '.addowner', 'addowner', '.delowner', 'delowner', '.listowner', 'listowner', '.listpremium', 'listpremium', '.delpremium', 'delpremium', '.setbotpp', 'setbotpp', '.setbotname', 'setbotname', '.self', 'self', '.publik', 'publik', '.setcoverbot', 'setcoverbot', '.delcoverbot', 'delcoverbot', '.anticall', 'anticall', '.autotyping', 'autotyping', '.addsewa', 'addsewa', '.delsewa', 'delsewa', '.listsewa', 'listsewa', '.owner', 'owner'];
-    const groupCommands = ['.groupmenu', 'groupmenu', '.delete', 'delete', '.hidetag', 'hidetag', '.kick', 'kick', '.add', 'add', '.open', 'open', '.close', 'close', '.open2', 'open2', '.close2', 'close2', '.antilinkall', 'antilinkall', '.linkgc', 'linkgc', '.setppgc', 'setppgc', '.delppgc', 'delppgc', '.setwelcome', 'setwelcome', '.setbye', 'setbye', '.welcome', 'welcome', '.goodbye', 'goodbye', '.antitagsw', 'antitagsw', '.antivideo', 'antivideo', '.antifoto', 'antifoto', '.antifoto1x', 'antifoto1x', '.antistiker', 'antistiker', '.antispam', 'antispam', '.setnamegc', 'setnamegc', '.setdescgc', 'setdescgc', '.stiker', 'stiker', '.hd', 'hd', '.culikswgc', 'culikswgc', '.culikprofilegc', 'culikprofilegc', '.kickall', 'kickall', '.brat', 'brat', '.bratvid', 'bratvid', '.smeme', 'smeme', '.sewabot', 'sewabot', '.promote', 'promote', '.demote', 'demote', '.tiktok', 'tiktok'];
+    const ownerCommands = ['.ownermenu', 'ownermenu', '.broadcast', 'broadcast', '.restartbot', 'restartbot', '.addpremium', 'addpremium', '.addprem', 'addprem', '.addowner', 'addowner', '.delowner', 'delowner', '.listowner', 'listowner', '.listpremium', 'listpremium', '.delpremium', 'delpremium', '.setbotpp', 'setbotpp', '.setbotname', 'setbotname', '.addnamabot', 'addnamabot', '.delnamabot', 'delnamabot', '.totalfitur', 'totalfitur', '.addprefix', 'addprefix', '.delprefix', 'delprefix', '.listprefix', 'listprefix', '.addpoweredby', 'addpoweredby', '.delpoweredby', 'delpoweredby', '.listpoweredby', 'listpoweredby', '.addcmd', 'addcmd', '.delcmd', 'delcmd', '.listcmd', 'listcmd', '.self', 'self', '.publik', 'publik', '.setcoverbot', 'setcoverbot', '.delcoverbot', 'delcoverbot', '.anticall', 'anticall', '.autotyping', 'autotyping', '.addsewa', 'addsewa', '.delsewa', 'delsewa', '.listsewa', 'listsewa', '.owner', 'owner', '.joingc', 'joingc', '.creategc', 'creategc', '.addsticker', 'addsticker', '.delsticker', 'delsticker'];
+    const groupCommands = ['.groupmenu', 'groupmenu', '.delete', 'delete', '.hidetag', 'hidetag', '.kick', 'kick', '.add', 'add', '.open', 'open', '.close', 'close', '.open2', 'open2', '.close2', 'close2', '.antilinkall', 'antilinkall', '.linkgc', 'linkgc', '.setppgc', 'setppgc', '.delppgc', 'delppgc', '.setwelcome', 'setwelcome', '.setbye', 'setbye', '.welcome', 'welcome', '.goodbye', 'goodbye', '.antitagsw', 'antitagsw', '.antivideo', 'antivideo', '.antifoto', 'antifoto', '.antifoto1x', 'antifoto1x', '.antistiker', 'antistiker', '.antispam', 'antispam', '.setnamegc', 'setnamegc', '.setdescgc', 'setdescgc', '.culikswgc', 'culikswgc', '.culikprofilegc', 'culikprofilegc', '.kickall', 'kickall', '.sewabot', 'sewabot', '.promote', 'promote', '.demote', 'demote', '.werewolf', 'werewolf', '.joinww', 'joinww', '.startww', 'startww', '.mutegc', 'mutegc', '.resetlink', 'resetlink', '.tagall', 'tagall', '.setbotbio', 'setbotbio', '.delbotbio', 'delbotbio', '.antivirtex', 'antivirtex', '.antitoxic', 'antitoxic'];
+    const funCommands = ['.funmenu', 'funmenu', '.cekkhodam', 'cekkhodam', '.cekganteng', 'cekganteng', '.cekcantik', 'cekcantik', '.cekjodoh', 'cekjodoh', '.ceklesby', 'ceklesby', '.cekpasangan', 'cekpasangan', '.cekgay', 'cekgay', '.cekhoby', 'cekhoby', '.cekkesetiaan', 'cekkesetiaan', '.jadian', 'jadian', '.kiss', 'kiss', '.quotes', 'quotes', '.avatar', 'avatar', '.ppcouple', 'ppcouple'];
+    const margaCommands = ['.margamenu', 'margamenu', '.cekpariban', 'cekpariban', '.cektartulang', 'cektartulang', '.cektarito', 'cektarito', '.cekpadan', 'cekpadan'];
+    const videoCommands = ['.videomenu', 'videomenu', '.tiktokgirl', 'tiktokgirl', '.tiktoktobrut', 'tiktoktobrut', '.tiktokkayes', 'tiktokkayes', '.tiktokhot', 'tiktokhot', '.tiktokghea', 'tiktokghea', '.tiktokbocil', 'tiktokbocil', '.tiktoklesbi', 'tiktoklesbi', '.tiktokgay', 'tiktokgay'];
+    const stickerCommands = ['.stickermenu', 'stickermenu', '.stiker', 'stiker', '.hd', 'hd', '.brat', 'brat', '.bratvid', 'bratvid', '.smeme', 'smeme', '.qc', 'qc'];
+    const downloadCommands = ['.downloadmenu', 'downloadmenu', '.tiktok', 'tiktok', '.playyt', 'playyt', '.fotosexy', 'fotosexy', '.pinterest', 'pinterest'];
     
     if (ownerCommands.includes(requestedCmd) && !isOwner) {
       this.broadcastState(`Blocked non-owner from using ${requestedCmd}`);
@@ -703,8 +730,36 @@ export class WhatsAppBot {
     // To be perfectly safe, only run if it's a command.
 
     // Basic Command Handler
-    if (body === "allmenu" || body === ".allmenu" || body === "all menu" || body === ".all menu") {
-      const menu = "📚 *Semua Menu*\n\n1. .groupmenu\n2. .gamemenu\n3. .ownermenu\n\nKetik menu yang kamu inginkan.";
+    
+    // Check if command is an alias for the menu
+    const possibleCommandName = requestedCmd.replace(/^\.?/, "").toLowerCase();
+    const isMenuCmd = this.menuCommands.has(possibleCommandName) || body.toLowerCase() === "all menu";
+
+    if (isMenuCmd) {
+      const botName = this.customBotName || this.sock.user?.name || "Wabot Pro";
+      const totalFitur = ownerCommands.length + groupCommands.length + funCommands.length + margaCommands.length + videoCommands.length + stickerCommands.length + downloadCommands.length;
+      let menu = `╭─   [ 𝐁𝐎𝐓 𝐈𝐍𝐅𝐎 ]
+│ 🔔 𝐍𝐚𝐦𝐚 𝐁𝐨𝐭 : ${botName}
+│ 👑 𝐎𝐰𝐧𝐞𝐫      : ${isOwner ? 'Owner' : 'User'}
+│ ⚠️ totalfitur : ${totalFitur}
+╰───────────────
+
+📚 *Semua Menu*
+
+│ .downloadmenu
+│ .groupmenu
+│ .gamemenu
+│ .ownermenu
+│ .funmenu
+│ .margamenu
+│ .videomenu
+│ .stickermenu
+
+Ketik menu yang kamu inginkan.`;
+      
+      if (this.poweredByText) {
+         menu += `\n\n_Powered by ${this.poweredByText}_`;
+      }
       if (this.coverImageBuffer) {
         await this.sock.sendMessage(jid, { image: this.coverImageBuffer, caption: menu }, { quoted: msg });
       } else {
@@ -714,77 +769,110 @@ export class WhatsAppBot {
     } else if (body === "groupmenu" || body === ".groupmenu" || body === "group menu" || body === ".group menu") {
       const groupText = `👥 *Group Menu*
 
-1. .hidetag
-2. .kick
-3. .add
-4. .open / .close
-5. .open2 / .close2
-6. .antilinkall
-7. .linkgc
-8. .setppgc
-9. .delppgc
-10. .setwelcome - untuk setting teks masuk
-11. .setgoodbye - untuk setting teks keluar
-12. .welcome on/off - untuk mengatur pesan masuk
-13. .goodbye on/off - untuk mengatur pesan keluar
-14. .antitagsw on/off - hapus story yang dikirim di grup
-15. .antivideo on/off - hapus video yang dikirim di grup
-16. .antifoto on/off - hapus foto yang dikirim di grup
-17. .antifoto1x on/off - hapus pesan sekali lihat yang dikirim di grup
-18. .antistiker on/off - hapus stiker yang dikirim di grup
-19. .antispam on/off - hapus spam yang dikirim di grup
-20. .setnamegc
-21. .setdescgc
-22. .stiker
-23. .hd
-24. .culikswgc
-25. .culikprofilegc
-26. .cekkhodam
-27. .cekganteng
-28. .cekcantik
-29. .cekjodoh
-30. .cekpariban - masukan marga/boru target agar tau marga/boru dia marpariban atau tidak menurut adat batak
-31. .cektartulang - masukan marga/boru target agar tau marga/boru dia martartulang atau tidak menurut adat batak
-32. .cektarito - masukan marga/boru target agar tau marga/boru dia martarito atau tidak menurut adat batak
-33. .cekpadan - masukan marga/boru target agar tau marga/boru dia marpadan atau tidak menurut adat batak
-34. .delete
-35. .kickall - keluarkan semua orang di grup
-36. .brat - stiker teks
-38. .bratvid - stiker teks video
-39. .smeme - stiker teks|teks
-40. .sewabot - teks custom
-41. .promote - tambah admin
-42. .demote - hapus admin
-43. .tiktok - download video dari link tiktok VT`;
+│ .hidetag
+│ .kick
+│ .add
+│ .open / .close
+│ .open2 / .close2
+│ .antilinkall
+│ .linkgc
+│ .setppgc
+│ .delppgc
+│ .setwelcome - untuk setting teks masuk
+│ .setgoodbye - untuk setting teks keluar
+│ .welcome on/off - untuk mengatur pesan masuk
+│ .goodbye on/off - untuk mengatur pesan keluar
+│ .antitagsw on/off - hapus story yang dikirim di grup
+│ .antivideo on/off - hapus video yang dikirim di grup
+│ .antifoto on/off - hapus foto yang dikirim di grup
+│ .antifoto1x on/off - hapus pesan sekali lihat yang dikirim di grup
+│ .antistiker on/off - hapus stiker yang dikirim di grup
+│ .antispam on/off - hapus spam yang dikirim di grup
+│ .setnamegc
+│ .setdescgc
+│ .culikswgc
+│ .culikprofilegc
+│ .mutegc on/off
+│ .resetlink
+│ .tagall
+│ .setbotbio
+│ .delbotbio
+│ .antivirtex on/off
+│ .antitoxic on/off
+│ .delete
+│ .kickall - keluarkan semua orang di grup
+│ .sewabot - teks custom
+│ .promote - tambah admin
+│ .demote - hapus admin`;
       await this.sock.sendMessage(jid, { text: groupText }, { quoted: msg });
       this.broadcastState(`Responded to groupmenu command`);
+    } else if (body === "downloadmenu" || body === ".downloadmenu" || body === "download menu" || body === ".download menu") {
+      const downloadText = `📥 *Download Menu*
+
+│ .tiktok - download video dari link tiktok VT
+│ .playyt - mencari dan mendownload audio/video Youtube
+│ .fotosexy - ambil foto random
+│ .pinterest - download foto pinterest`;
+      await this.sock.sendMessage(jid, { text: downloadText }, { quoted: msg });
+      this.broadcastState(`Responded to downloadmenu command`);
+    } else if (body === "stickermenu" || body === ".stickermenu" || body === "sticker menu" || body === ".sticker menu") {
+      const stickerText = `🎨 *Sticker Menu*\n\n│ .stiker - ubah gambar jadi stiker\n│ .hd - tingkatkan resolusi gambar\n│ .brat - buat stiker teks brat\n│ .bratvid - buat stiker teks video brat\n│ .smeme - buat stiker dengan teks|teks\n│ .qc - buat stiker text chat`;
+      await this.sock.sendMessage(jid, { text: stickerText }, { quoted: msg });
+      this.broadcastState(`Responded to stickermenu command`);
+    } else if (body === "funmenu" || body === ".funmenu" || body === "fun menu" || body === ".fun menu") {
+      const funText = `🤡 *Fun Menu*\n\n│ .cekkhodam\n│ .cekganteng\n│ .cekcantik\n│ .cekjodoh\n│ .ceklesby\n│ .cekpasangan\n│ .cekgay\n│ .cekhoby\n│ .cekkesetiaan\n│ .jadian\n│ .kiss\n│ .quotes\n│ .avatar\n│ .ppcouple`;
+      await this.sock.sendMessage(jid, { text: funText }, { quoted: msg });
+      this.broadcastState(`Responded to funmenu command`);
+    } else if (body === "margamenu" || body === ".margamenu" || body === "marga menu" || body === ".marga menu") {
+      const margaText = `👥 *Marga Menu*\n\n│ .cekpariban - masukan marga/boru target agar tau marga/boru dia marpariban atau tidak menurut adat batak\n│ .cektartulang - masukan marga/boru target agar tau marga/boru dia martartulang atau tidak menurut adat batak\n│ .cektarito - masukan marga/boru target agar tau marga/boru dia martarito atau tidak menurut adat batak\n│ .cekpadan - masukan marga/boru target agar tau marga/boru dia marpadan atau tidak menurut adat batak`;
+      await this.sock.sendMessage(jid, { text: margaText }, { quoted: msg });
+      this.broadcastState(`Responded to margamenu command`);
+    } else if (body === "videomenu" || body === ".videomenu" || body === "video menu" || body === ".video menu") {
+      const videoText = `🎬 *Video Menu*\n\n│ .tiktokgirl\n│ .tiktoktobrut\n│ .tiktokkayes\n│ .tiktokhot\n│ .tiktokghea\n│ .tiktokbocil\n│ .tiktoklesbi\n│ .tiktokgay`;
+      await this.sock.sendMessage(jid, { text: videoText }, { quoted: msg });
+      this.broadcastState(`Responded to videomenu command`);
     } else if (body === "gamemenu" || body === ".gamemenu" || body === "game menu" || body === ".game menu") {
-      await this.sock.sendMessage(jid, { text: "🎮 *Game Menu*\n\n1. .tebakgambar\n2. .susunkata\n3. .math\n4. .tebakkata\n5. .tebakbendera\n6. .asahotak\n7. .tebaklirik\n8. .tekateki\n9. .tebakangka\n10. .kuis\n11. .tebakkota\n12. .family100\n13. .tebakusia\n14. .tebakkimia" }, { quoted: msg });
+      await this.sock.sendMessage(jid, { text: "🎮 *Game Menu*\n\n│ .tebakgambar\n│ .susunkata\n│ .math\n│ .tebakkata\n│ .tebakbendera\n│ .asahotak\n│ .tebaklirik\n│ .tekateki\n│ .tebakangka\n│ .kuis\n│ .tebakkota\n│ .family100\n│ .tebakusia\n│ .tebakkimia\n│ .werewolf" }, { quoted: msg });
       this.broadcastState(`Responded to gamemenu command`);
     } else if (body === "ownermenu" || body === ".ownermenu" || body === "owner menu" || body === ".owner menu") {
       const ownerText = `👑 *Owner Menu*
 
-1. .broadcast
-2. .restartbot
-3. .addpremium
-4. .addowner
-5. .delowner
-6. .listowner
-7. .listpremium
-8. .delpremium
-9. .setbotpp
-10. .setbotname
-11. .self / .publik
-12. .setcoverbot
-13. .delcoverbot
-14. .anticall on/off
-15. .antivideo on/off - hapus video yang dikirim di grup
-16. .autotyping on/off - sedang mengetik
-18. .addsewa - tambah nomor sewa
-19. .delsewa - hapus nomor sewa
-20. .listsewa - list nomor sewa
-21. .owner - menampilkan list owner`;
-      await this.sock.sendMessage(jid, { text: ownerText }, { quoted: msg });
+│ .broadcast
+│ .restartbot
+│ .addpremium / .delpremium
+│ .addowner / .delowner
+│ .listowner
+│ .listpremium
+│ .setbotpp
+│ .setbotname
+│ .addnamabot
+│ .delnamabot
+│ .addprefix
+│ .delprefix
+│ .listprefix
+│ .addpoweredby
+│ .delpoweredby
+│ .listpoweredby
+│ .addcmd
+│ .delcmd
+│ .listcmd
+│ .self / .publik
+│ .setcoverbot / .delcoverbot
+│ .anticall on/off
+│ .antivideo on/off - hapus video yang dikirim di grup
+│ .autotyping on/off - sedang mengetik
+│ .addsewa - tambah nomor sewa
+│ .delsewa - hapus nomor sewa
+│ .listsewa - list nomor sewa
+│ .owner - menampilkan list owner
+│ .joingc - bot masuk grup dari link
+│ .creategc - buat grup baru
+│ .addsticker - tambah stiker
+│ .delsticker - hapus stiker
+│ .totalfitur`;
+      
+      let msgObj: any = { text: ownerText };
+      await this.sock.sendMessage(jid, msgObj, { quoted: msg });
       this.broadcastState(`Responded to ownermenu command`);
     } else if (body.startsWith(".kick") || body.startsWith("kick")) {
       if (!jid.endsWith("@g.us")) {
@@ -857,7 +945,7 @@ export class WhatsAppBot {
         }
       }
       this.broadcastState(`Responded to kickall command`);
-    } else if (body.startsWith(".add") || body.startsWith("add")) {
+    } else if (body.startsWith(".add ") || body === ".add" || body.startsWith("add ") || body === "add") {
       if (!jid.endsWith("@g.us")) {
         await this.sock.sendMessage(jid, { text: "Perintah ini hanya bisa digunakan di dalam grup!" }, { quoted: msg });
       } else {
@@ -1081,6 +1169,47 @@ export class WhatsAppBot {
           this.activeGames.set(sentMsg.key.id, { answer: target.toString(), type: "tebakangka", attempts: 0 });
       }
       this.broadcastState(`Responded to tebakangka command`);
+    } else if (body === ".werewolf" || body === "werewolf") {
+      const sender = msg.key.participant || msg.participant || msg.key.remoteJid;
+      this.activeGames.set("werewolf_" + jid, { type: "werewolf", state: "joining", players: [sender], answer: "" });
+      await this.sock.sendMessage(jid, { text: `🐺 *Game Werewolf*\n\nGame dibuat! Ketik .joinww untuk bergabung!\nPemain: 1` }, { quoted: msg });
+      this.broadcastState(`Responded to werewolf command`);
+    } else if (body === ".joinww" || body === "joinww") {
+      const wwGame = this.activeGames.get("werewolf_" + jid);
+      const sender = msg.key.participant || msg.participant || msg.key.remoteJid;
+      if (wwGame && wwGame.type === "werewolf" && wwGame.state === "joining") {
+          const players = wwGame.players as string[];
+          if (!players.includes(sender!)) {
+              players.push(sender!);
+              await this.sock.sendMessage(jid, { text: `🐺 *Game Werewolf*\n\n@${sender!.split('@')[0]} bergabung!\nTotal Pemain: ${players.length}\nKetik .startww jika sudah cukup.`, mentions: [sender!] }, { quoted: msg });
+          } else {
+              await this.sock.sendMessage(jid, { text: `Kamu sudah bergabung!` }, { quoted: msg });
+          }
+      } else {
+          await this.sock.sendMessage(jid, { text: `Tidak ada game werewolf yang sedang menunggu.` }, { quoted: msg });
+      }
+    } else if (body === ".startww" || body === "startww") {
+       const wwGame = this.activeGames.get("werewolf_" + jid);
+       if (wwGame && wwGame.type === "werewolf" && wwGame.state === "joining") {
+          const players = wwGame.players as string[];
+          if (players.length < 3) {
+             await this.sock.sendMessage(jid, { text: `Minimal 3 pemain untuk memulai Game Werewolf!` }, { quoted: msg });
+             return;
+          }
+          let roles = ["Werewolf", "Seer"];
+          while(roles.length < players.length) {
+              roles.push("Villager");
+          }
+          // Shuffle roles
+          roles = roles.sort(() => Math.random() - 0.5);
+          for(let i=0; i<players.length; i++) {
+             try {
+                await this.sock.sendMessage(players[i], { text: `Kamu mendapatkan peran: *${roles[i]}* dalam Game Werewolf di grup ini.` });
+             } catch(e) {}
+          }
+          await this.sock.sendMessage(jid, { text: `🐺 *Game Werewolf Dimulai!*\n\nPeran sudah dibagikan lewat private message / DM bot.\nKarena ini adalah mode klasik, permainan berakhir otomatis di sini, silakan bermain secara roleplay lanjutan.` }, { quoted: msg });
+          this.activeGames.delete("werewolf_" + jid);
+       }
     } else if (body.startsWith(".broadcast") || body.startsWith("broadcast")) {
       const text = body.replace(/^\.?broadcast\s/i, "").trim();
       if (!text) {
@@ -1093,10 +1222,10 @@ export class WhatsAppBot {
       await this.sock.sendMessage(jid, { text: `🔄 *Restarting...*\n\nBot sedang dimulai ulang. Harap tunggu sebentar.` }, { quoted: msg });
       this.broadcastState(`Responded to restartbot command`);
       setTimeout(() => this.restart(), 1000);
-    } else if (body.startsWith(".addpremium") || body.startsWith("addpremium")) {
-      const args = messageContent.replace(/^\.?addpremium\s*/i, "").trim();
+    } else if (body.startsWith(".addpremium") || body.startsWith("addpremium") || body.startsWith(".addprem") || body.startsWith("addprem")) {
+      const args = messageContent.replace(/^\.?(addpremium|addprem)\s*/i, "").trim();
       if (!args && !msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length) {
-        await this.sock.sendMessage(jid, { text: `Kirim nomor atau tag user yang ingin dijadikan premium!\nContoh: .addpremium @user` }, { quoted: msg });
+        await this.sock.sendMessage(jid, { text: `Kirim nomor atau tag user yang ingin dijadikan premium!\nContoh: .addprem @user` }, { quoted: msg });
       } else {
         await this.sock.sendMessage(jid, { text: `✨ *Add Premium*\n\nBerhasil menambahkan user ke daftar premium!` }, { quoted: msg });
       }
@@ -1134,13 +1263,85 @@ export class WhatsAppBot {
               await this.sock.sendMessage(jid, { text: `❌ Gagal mengubah profil bot.` }, { quoted: msg });
           }
       }
-    } else if (body.startsWith(".setbotname") || body.startsWith("setbotname")) {
-      const text = messageContent.replace(/^\.?setbotname\s*/i, "").trim();
+    } else if (body.startsWith(".setbotname") || body.startsWith("setbotname") || body.startsWith(".addnamabot") || body.startsWith("addnamabot")) {
+      const isAddNamaBot = body.startsWith(".addnamabot") || body.startsWith("addnamabot");
+      const text = messageContent.replace(/^\.?(setbotname|addnamabot)\s*/i, "").trim();
       if (!text) {
-        await this.sock.sendMessage(jid, { text: `Kirim perintah dengan nama baru, contoh: .setbotname Bot Ku` }, { quoted: msg });
+        await this.sock.sendMessage(jid, { text: `Kirim perintah dengan nama baru, contoh: .${isAddNamaBot ? 'addnamabot' : 'setbotname'} Bot Ku` }, { quoted: msg });
       } else {
+        this.customBotName = text;
+        this.broadcastState(`Changed bot name to ${text}`);
         await this.sock.sendMessage(jid, { text: `✅ Berhasil mengubah nama bot menjadi: ${text}` }, { quoted: msg });
       }
+    } else if (body === ".delnamabot" || body === "delnamabot") {
+      this.customBotName = null;
+      this.broadcastState(`Deleted custom bot name`);
+      await this.sock.sendMessage(jid, { text: `✅ Berhasil mereset nama bot ke default.` }, { quoted: msg });
+    } else if (body === ".totalfitur" || body === "totalfitur") {
+      const totalFitur = ownerCommands.length + groupCommands.length + margaCommands.length + videoCommands.length + stickerCommands.length;
+      await this.sock.sendMessage(jid, { text: `⚠️ *Total Fitur Bot* : ${totalFitur} Fitur` }, { quoted: msg });
+    } else if (body.startsWith(".addprefix") || body.startsWith("addprefix")) {
+      const text = messageContent.replace(/^\.?addprefix\s*/i, "").trim();
+      if (!text) {
+        await this.sock.sendMessage(jid, { text: `Kirim perintah dengan prefix baru, contoh: .addprefix !` }, { quoted: msg });
+      } else {
+        await this.sock.sendMessage(jid, { text: `✅ Berhasil menambahkan prefix: ${text}` }, { quoted: msg });
+      }
+    } else if (body.startsWith(".delprefix") || body.startsWith("delprefix")) {
+      const text = messageContent.replace(/^\.?delprefix\s*/i, "").trim();
+      if (!text) {
+        await this.sock.sendMessage(jid, { text: `Kirim perintah dengan prefix yang ingin dihapus, contoh: .delprefix !` }, { quoted: msg });
+      } else {
+        await this.sock.sendMessage(jid, { text: `✅ Berhasil menghapus prefix: ${text}` }, { quoted: msg });
+      }
+    } else if (body === ".listprefix" || body === "listprefix") {
+      await this.sock.sendMessage(jid, { text: `📋 *Daftar Prefix*\n\n1. .\n2. !` }, { quoted: msg });
+    } else if (body.startsWith(".addpoweredby") || body.startsWith("addpoweredby")) {
+      const text = messageContent.replace(/^\.?addpoweredby\s*/i, "").trim();
+      if (!text) {
+        await this.sock.sendMessage(jid, { text: `Kirim perintah dengan teks powered by baru, contoh: .addpoweredby Wabot Pro` }, { quoted: msg });
+      } else {
+        this.poweredByText = text;
+        this.broadcastState(`Changed powered by text to ${text}`);
+        await this.sock.sendMessage(jid, { text: `✅ Berhasil menambahkan Powered By: ${text}` }, { quoted: msg });
+      }
+    } else if (body === ".delpoweredby" || body === "delpoweredby") {
+      this.poweredByText = null;
+      this.broadcastState(`Deleted powered by text`);
+      await this.sock.sendMessage(jid, { text: `✅ Berhasil menghapus Powered By` }, { quoted: msg });
+    } else if (body === ".listpoweredby" || body === "listpoweredby") {
+      const current = this.poweredByText || "Belum diset";
+      await this.sock.sendMessage(jid, { text: `📋 *Daftar Powered By*\n\n1. ${current}` }, { quoted: msg });
+    } else if (body.startsWith(".addcmd") || body.startsWith("addcmd")) {
+      const text = messageContent.replace(/^\.?addcmd\s*/i, "").trim().toLowerCase();
+      if (!text) {
+        await this.sock.sendMessage(jid, { text: `Kirim perintah dengan command baru untuk menu!\nContoh: .addcmd menu` }, { quoted: msg });
+      } else {
+        this.menuCommands.add(text);
+        this.broadcastState(`Added menu command ${text}`);
+        await this.sock.sendMessage(jid, { text: `✅ Berhasil menambahkan command menu: ${text}` }, { quoted: msg });
+      }
+    } else if (body.startsWith(".delcmd") || body.startsWith("delcmd")) {
+      const text = messageContent.replace(/^\.?delcmd\s*/i, "").trim().toLowerCase();
+      if (!text) {
+        await this.sock.sendMessage(jid, { text: `Kirim perintah dengan nama command yang ingin dihapus!\nContoh: .delcmd menu` }, { quoted: msg });
+      } else {
+        if (this.menuCommands.has(text)) {
+          this.menuCommands.delete(text);
+          this.broadcastState(`Deleted menu command ${text}`);
+          await this.sock.sendMessage(jid, { text: `✅ Berhasil menghapus command menu: ${text}` }, { quoted: msg });
+        } else {
+          await this.sock.sendMessage(jid, { text: `❌ Command ${text} tidak ditemukan.` }, { quoted: msg });
+        }
+      }
+    } else if (body === ".listcmd" || body === "listcmd") {
+      let list = `📋 *Daftar Custom Menu Command*\n\n`;
+      let i = 1;
+      for (const cmd of this.menuCommands) {
+        list += `${i}. ${cmd}\n`;
+        i++;
+      }
+      await this.sock.sendMessage(jid, { text: list.trim() }, { quoted: msg });
     } else if (body === ".self" || body === "self" || body === ".publik" || body === "publik") {
       const mode = body.replace(".", "");
       await this.sock.sendMessage(jid, { text: `✅ Berhasil mengubah mode bot menjadi: ${mode}` }, { quoted: msg });
@@ -1234,7 +1435,33 @@ export class WhatsAppBot {
       } catch (e) {
         await this.sock.sendMessage(jid, { text: "❌ Format jam tidak valid." }, { quoted: msg });
       }
-    } else if (body.startsWith(".tiktok") || body.startsWith("tiktok")) {
+    } else if (body.startsWith(".tiktokgirl") || body.startsWith("tiktokgirl") || 
+               body.startsWith(".tiktoktobrut") || body.startsWith("tiktoktobrut") || 
+               body.startsWith(".tiktokkayes") || body.startsWith("tiktokkayes") || 
+               body.startsWith(".tiktokhot") || body.startsWith("tiktokhot") || 
+               body.startsWith(".tiktokghea") || body.startsWith("tiktokghea") || 
+               body.startsWith(".tiktokbocil") || body.startsWith("tiktokbocil") || 
+               body.startsWith(".tiktoklesbi") || body.startsWith("tiktoklesbi") || 
+               body.startsWith(".tiktokgay") || body.startsWith("tiktokgay")) {
+      const targetQuery = body.split(" ")[0].replace(".", "");
+      const searchQuery = targetQuery.replace("tiktok", "");
+      await this.sock.sendMessage(jid, { text: `⏳ *Permintaan Video ${targetQuery}*\n\nSedang mencari referensi video... Mohon tunggu sebentar.` }, { quoted: msg });
+      
+      try {
+        const fetchRes = await axios.get(`https://www.tikwm.com/api/feed/search?keywords=${searchQuery}`);
+        if (fetchRes.data && fetchRes.data.code === 0 && fetchRes.data.data && fetchRes.data.data.videos && fetchRes.data.data.videos.length > 0) {
+          const videos = fetchRes.data.data.videos;
+          const randomVideo = videos[Math.floor(Math.random() * videos.length)];
+          const videoUrl = randomVideo.play;
+          await this.sock.sendMessage(jid, { video: { url: videoUrl }, caption: `✅ *Berhasil menemukan video!*\n\n${targetQuery}\n\n${randomVideo.title || ''}` }, { quoted: msg });
+        } else {
+          await this.sock.sendMessage(jid, { text: `❌ *Video Gagal Dimuat*\n\nMaaf, tidak dapat menemukan video untuk kueri tersebut.` }, { quoted: msg });
+        }
+      } catch (e) {
+        await this.sock.sendMessage(jid, { text: `❌ *Video Gagal Dimuat*\n\nMaaf, API provider video sedang bermasalah atau dalam perbaikan. Silakan coba lagi nanti.` }, { quoted: msg });
+      }
+      this.broadcastState(`Responded to ${targetQuery} command`);
+    } else if (body.startsWith(".tiktok ") || body === ".tiktok" || body.startsWith("tiktok ") || body === "tiktok") {
       const urlMatches = messageContent.match(/(https?:\/\/[^\s]+)/g);
       if (!urlMatches) {
         await this.sock.sendMessage(jid, { text: "Link TikTok tidak ditemukan. Contoh: .tiktok https://vt.tiktok.com/ZS9pCeuV4/" }, { quoted: msg });
@@ -1252,6 +1479,76 @@ export class WhatsAppBot {
         }
       } catch (e) {
         await this.sock.sendMessage(jid, { text: "❌ *Gagal mendownload video dari server.*" }, { quoted: msg });
+      }
+    } else if (body.startsWith(".playyt ") || body.startsWith("playyt ")) {
+      const q = messageContent.replace(/^\.?playyt\s*/i, "").trim();
+      await this.sock.sendMessage(jid, { text: `⏳ *Sedang mencari "${q}" di Youtube...*` }, { quoted: msg });
+      try {
+        const search = await btch.yts(q);
+        if (search.result && search.result.videos && search.result.videos.length > 0) {
+           const firstVideo = search.result.videos[0];
+           const ytInfo = `🎧 *PLAY YOUTUBE*\n\n📌 Judul: ${firstVideo.title}\n⏱ Durasi: ${firstVideo.duration.timestamp}\n👀 Views: ${firstVideo.views}\n📺 Channel: ${firstVideo.author.name}\n\n✅ *Video Ditemukan!*\n🔗 Link: ${firstVideo.url}\n⏳ _Sedang mengambil audio, mohon tunggu..._`;
+           await this.sock.sendMessage(jid, { image: { url: firstVideo.image }, caption: ytInfo }, { quoted: msg });
+
+           let ytDownload: any;
+           for (let i = 0; i < 3; i++) {
+             try {
+               ytDownload = await btch.youtube(firstVideo.url);
+               if (ytDownload && ytDownload.mp3) break;
+             } catch (e) {
+               // ignore timeout and retry
+             }
+             await new Promise(r => setTimeout(r, 2000));
+           }
+           
+           if (ytDownload && ytDownload.mp3) {
+             try {
+               const { data } = await axios.get(ytDownload.mp3, { responseType: 'arraybuffer', headers: { "User-Agent": "Mozilla/5.0" } });
+               const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+               await this.sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mpeg', ptt: false }, { quoted: msg });
+             } catch (dlError) {
+               await this.sock.sendMessage(jid, { text: "❌ *Gagal mengunduh audio dari server (link mati/timeout).*" }, { quoted: msg });
+               console.error("Audio download error:", dlError);
+             }
+           } else {
+             await this.sock.sendMessage(jid, { text: "❌ *Gagal mengambil link audio setelah 3 percobaan.*" }, { quoted: msg });
+           }
+        } else {
+           await this.sock.sendMessage(jid, { text: "❌ *Video tidak ditemukan.*" }, { quoted: msg });
+        }
+      } catch (e) {
+        await this.sock.sendMessage(jid, { text: "❌ *Gagal mencari di server.*" }, { quoted: msg });
+      }
+    } else if (body.startsWith(".fotosexy") || body.startsWith("fotosexy")) {
+      await this.sock.sendMessage(jid, { text: "⏳ *Sedang mengambil gambar random...*" }, { quoted: msg });
+      try {
+         const p = await ab.pinterest("cewek cantik aesthetic");
+         if (p && p.result && p.result.result && p.result.result.length > 0) {
+            const arr = p.result.result;
+            const randomIdx = Math.floor(Math.random() * arr.length);
+            const imageUrl = arr[randomIdx].image_url;
+            await this.sock.sendMessage(jid, { image: { url: imageUrl }, caption: "📸 *Random Foto*" }, { quoted: msg });
+         } else {
+            await this.sock.sendMessage(jid, { text: "❌ *Gagal menemukan foto.*" }, { quoted: msg });
+         }
+      } catch (e) {
+         await this.sock.sendMessage(jid, { text: "❌ *Server error mengambil gambar.*" }, { quoted: msg });
+      }
+    } else if (body.startsWith(".pinterest ") || body.startsWith("pinterest ")) {
+      const q = messageContent.replace(/^\.?pinterest\s*/i, "").trim();
+      await this.sock.sendMessage(jid, { text: `⏳ *Sedang mendownload foto Pinterest untuk "${q}"...*` }, { quoted: msg });
+      try {
+         const p = await ab.pinterest(q);
+         if (p && p.result && p.result.result && p.result.result.length > 0) {
+            const arr = p.result.result;
+            const randomIdx = Math.floor(Math.random() * arr.length);
+            const imageUrl = arr[randomIdx].image_url;
+            await this.sock.sendMessage(jid, { image: { url: imageUrl }, caption: `📸 *Pinterest: ${q}*` }, { quoted: msg });
+         } else {
+            await this.sock.sendMessage(jid, { text: "❌ *Foto tidak ditemukan.*" }, { quoted: msg });
+         }
+      } catch (e) {
+         await this.sock.sendMessage(jid, { text: "❌ *Gagal mencari di server Pinterest.*" }, { quoted: msg });
       }
     } else if (body.startsWith(".antilinkall") || body.startsWith("antilinkall")) {
       if (body.includes("on")) {
@@ -1341,6 +1638,58 @@ export class WhatsAppBot {
           } catch (e) {
              console.error("Smeme error: ", e);
              await this.sock.sendMessage(jid, { text: `❌ Gagal membuat stiker meme.` }, { quoted: msg });
+          }
+       }
+    } else if (body.startsWith(".qc") || body.startsWith("qc")) {
+       const text = messageContent.replace(/^\.?qc\s*/i, "").trim();
+       if (!text) {
+          await this.sock.sendMessage(jid, { text: `Kirim teks untuk dibuat QC!\nContoh: .qc Halo semuanya` }, { quoted: msg });
+       } else {
+          try {
+             let avatarUrl = "https://i.pravatar.cc/300";
+             try {
+                 const participant = msg.key.participant || msg.key.remoteJid;
+                 if (participant) {
+                     avatarUrl = await this.sock.profilePictureUrl(participant, 'image');
+                 }
+             } catch (e) {
+                 // Fallback to default avatar
+             }
+             const pushName = msg.pushName || "User";
+
+             const payload = {
+                 type: "quote",
+                 format: "png",
+                 backgroundColor: "#1b1429",
+                 width: 512,
+                 height: 768,
+                 scale: 2,
+                 messages: [{
+                     entities: [],
+                     avatar: true,
+                     from: {
+                         id: 1,
+                         name: pushName,
+                         photo: {
+                             url: avatarUrl
+                         }
+                     },
+                     text: text,
+                     replyMessage: {}
+                 }]
+             };
+             
+             const res = await axios.post("https://bot.lyo.su/quote/generate", payload);
+             if (res.data && res.data.result && res.data.result.image) {
+                const buffer = Buffer.from(res.data.result.image, 'base64');
+                const finalBuffer = await sharp(buffer).webp().toBuffer();
+                await this.sock.sendMessage(jid, { sticker: finalBuffer }, { quoted: msg });
+             } else {
+                throw new Error("Invalid response from API");
+             }
+          } catch (e) {
+             console.error("QC error: ", e);
+             await this.sock.sendMessage(jid, { text: `❌ Gagal membuat QC.` }, { quoted: msg });
           }
        }
     } else if (body.startsWith(".sewabot") || body.startsWith("sewabot")) {
@@ -1480,7 +1829,7 @@ export class WhatsAppBot {
       } else {
         await this.sock.sendMessage(jid, { text: `Ketik on atau off! Contoh: .goodbye on` }, { quoted: msg });
       }
-    } else if (body.startsWith(".antitagsw") || body.startsWith("antitagsw") || body.startsWith(".antivideo") || body.startsWith("antivideo") || body.startsWith(".antifoto1x") || body.startsWith("antifoto1x") || body.startsWith(".antifoto") || body.startsWith("antifoto") || body.startsWith(".antistiker") || body.startsWith("antistiker") || body.startsWith(".antispam") || body.startsWith("antispam")) {
+    } else if (body.startsWith(".antitagsw") || body.startsWith("antitagsw") || body.startsWith(".antivideo") || body.startsWith("antivideo") || body.startsWith(".antifoto1x") || body.startsWith("antifoto1x") || body.startsWith(".antifoto") || body.startsWith("antifoto") || body.startsWith(".antistiker") || body.startsWith("antistiker") || body.startsWith(".antispam") || body.startsWith("antispam") || body.startsWith(".antivirtex") || body.startsWith("antivirtex") || body.startsWith(".antitoxic") || body.startsWith("antitoxic")) {
       const featureName = body.split(" ")[0].replace(".", "");
       if (body.includes("on")) {
         if (featureName === 'antivideo') this.antiVideoGroups.add(jid);
@@ -1489,6 +1838,8 @@ export class WhatsAppBot {
         if (featureName === 'antistiker') this.antiStikerGroups.add(jid);
         if (featureName === 'antispam') this.antiSpamGroups.add(jid);
         if (featureName === 'antitagsw') this.antiTagSwGroups.add(jid);
+        if (featureName === 'antivirtex') this.antiVirtexGroups.add(jid);
+        if (featureName === 'antitoxic') this.antiToxicGroups.add(jid);
         await this.sock.sendMessage(jid, { text: `✅ Fitur ${featureName} berhasil diaktifkan!` }, { quoted: msg });
       } else if (body.includes("off")) {
         if (featureName === 'antivideo') this.antiVideoGroups.delete(jid);
@@ -1497,6 +1848,8 @@ export class WhatsAppBot {
         if (featureName === 'antistiker') this.antiStikerGroups.delete(jid);
         if (featureName === 'antispam') this.antiSpamGroups.delete(jid);
         if (featureName === 'antitagsw') this.antiTagSwGroups.delete(jid);
+        if (featureName === 'antivirtex') this.antiVirtexGroups.delete(jid);
+        if (featureName === 'antitoxic') this.antiToxicGroups.delete(jid);
         await this.sock.sendMessage(jid, { text: `❌ Fitur ${featureName} berhasil dimatikan!` }, { quoted: msg });
       } else {
         await this.sock.sendMessage(jid, { text: `Ketik on atau off! Contoh: .${featureName} on` }, { quoted: msg });
@@ -1622,6 +1975,154 @@ export class WhatsAppBot {
       const percentage = Math.floor(Math.random() * 101);
       await this.sock.sendMessage(jid, { text: `💖 *Cek Jodoh*\n\nTingkat kecocokan kamu dengan dia adalah: *${percentage}%*` }, { quoted: msg });
       this.broadcastState(`Responded to cekjodoh command`);
+    } else if (body.startsWith(".ceklesby") || body.startsWith("ceklesby") || body.startsWith(".cekgay") || body.startsWith("cekgay") || body.startsWith(".cekpasangan") || body.startsWith("cekpasangan") || body.startsWith(".cekkesetiaan") || body.startsWith("cekkesetiaan")) {
+      const percentage = Math.floor(Math.random() * 101);
+      const cmdName = body.split(" ")[0].replace(".", "");
+      await this.sock.sendMessage(jid, { text: `📊 *${cmdName.toUpperCase()}*\n\nHasil: *${percentage}%*` }, { quoted: msg });
+    } else if (body.startsWith(".cekhoby") || body.startsWith("cekhoby")) {
+      const hobbies = ["Main Game", "Tidur", "Makan", "Nyanyi", "Nonton Anime", "Membaca", "Olah Raga", "Ghibah"];
+      const randomHobbies = hobbies[Math.floor(Math.random() * hobbies.length)];
+      await this.sock.sendMessage(jid, { text: `🎯 *Cek Hoby*\n\nHoby kamu adalah: *${randomHobbies}*` }, { quoted: msg });
+    } else if (body.startsWith(".jadian") || body.startsWith("jadian") || body.startsWith(".kiss") || body.startsWith("kiss")) {
+      if (!isGroup) {
+         await this.sock.sendMessage(jid, { text: "Hanya bisa di grup!" }, { quoted: msg });
+      } else {
+         const metadata = await this.sock.groupMetadata(jid);
+         const members = metadata.participants;
+         const cmd = body.split(" ")[0].replace(".", "");
+         if (members.length < 2) return;
+         let m1 = members[Math.floor(Math.random() * members.length)].id;
+         let m2 = members[Math.floor(Math.random() * members.length)].id;
+         while (m1 === m2) {
+            m2 = members[Math.floor(Math.random() * members.length)].id;
+         }
+         
+         if (cmd === "kiss") {
+           await this.sock.sendMessage(jid, { text: `@${m1.split("@")[0]} 💋 mencium @${m2.split("@")[0]}`, mentions: [m1, m2] }, { quoted: msg });
+         } else {
+           await this.sock.sendMessage(jid, { text: `Ciee, @${m1.split("@")[0]} ❤️ jadian sama @${m2.split("@")[0]} 🎉`, mentions: [m1, m2] }, { quoted: msg });
+         }
+      }
+    } else if (body.startsWith(".quotes") || body.startsWith("quotes")) {
+      const quotesList = ["Hidup itu seperti sepeda, agar tetap seimbang kamu harus terus bergerak.", "Jangan putus asa, tidak ada sukses tanpa perjuangan.", "Waktu adalah uang.", "Masa depan adalah milik mereka yang percaya pada keindahan mimpi mereka."];
+      const randomQuote = quotesList[Math.floor(Math.random() * quotesList.length)];
+      await this.sock.sendMessage(jid, { text: `📝 *Quotes*\n\n"${randomQuote}"` }, { quoted: msg });
+    } else if (body.startsWith(".avatar") || body.startsWith("avatar") || body.startsWith(".ppcouple") || body.startsWith("ppcouple")) {
+      const isAvatar = body.startsWith(".avatar") || body.startsWith("avatar");
+      if (isAvatar) {
+        const seed = Math.random().toString(36).substring(7);
+        const url = `https://api.dicebear.com/7.x/pixel-art/png?seed=${seed}`;
+        await this.sock.sendMessage(jid, { image: { url }, caption: "Ini avatar random kamu!" }, { quoted: msg });
+      } else {
+        const seed1 = Math.random().toString(36).substring(7);
+        const seed2 = Math.random().toString(36).substring(7);
+        await this.sock.sendMessage(jid, { image: { url: `https://api.dicebear.com/7.x/adventurer/png?seed=${seed1}` }, caption: "Cowok" }, { quoted: msg });
+        await this.sock.sendMessage(jid, { image: { url: `https://api.dicebear.com/7.x/adventurer/png?seed=${seed2}` }, caption: "Cewek" }, { quoted: msg });
+      }
+    } else if (body.startsWith(".mutegc ") || body.startsWith("mutegc ")) {
+      if (!isGroup) {
+         await this.sock.sendMessage(jid, { text: "Perintah ini hanya bisa digunakan di grup!" }, { quoted: msg });
+      } else {
+         const param = body.split(" ")[1]?.toLowerCase();
+         if (param === "on") {
+           await this.sock.groupSettingUpdate(jid, 'announcement');
+           await this.sock.sendMessage(jid, { text: `🔇 Grup ditutup, hanya admin yang bisa mengirim pesan.` }, { quoted: msg });
+         } else if (param === "off") {
+           await this.sock.groupSettingUpdate(jid, 'not_announcement');
+           await this.sock.sendMessage(jid, { text: `🔊 Grup dibuka, semua orang bisa mengirim pesan.` }, { quoted: msg });
+         } else {
+           await this.sock.sendMessage(jid, { text: `Ketik .mutegc on atau .mutegc off` }, { quoted: msg });
+         }
+      }
+    } else if (body.startsWith(".resetlink") || body.startsWith("resetlink")) {
+      if (!isGroup) {
+         await this.sock.sendMessage(jid, { text: "Perintah ini hanya bisa digunakan di grup!" }, { quoted: msg });
+      } else {
+         await this.sock.groupRevokeInvite(jid);
+         await this.sock.sendMessage(jid, { text: `✅ Berhasil mereset link grup!` }, { quoted: msg });
+      }
+    } else if (body.startsWith(".tagall") || body.startsWith("tagall")) {
+      if (!isGroup) {
+         await this.sock.sendMessage(jid, { text: "Perintah ini hanya bisa digunakan di grup!" }, { quoted: msg });
+      } else {
+         const metadata = await this.sock.groupMetadata(jid);
+         const members = metadata.participants.map(p => p.id);
+         let text = `📣 *Tag All*\n\n`;
+         members.forEach((m) => {
+            text += `│ ◦ @${m.split('@')[0]}\n`;
+         });
+         await this.sock.sendMessage(jid, { text, mentions: members }, { quoted: msg });
+      }
+    } else if (body.startsWith(".setbotbio") || body.startsWith("setbotbio") || body.startsWith(".delbotbio") || body.startsWith("delbotbio")) {
+      const isDel = body.startsWith(".delbotbio") || body.startsWith("delbotbio");
+      if (isDel) {
+         await this.sock.updateProfileStatus("I am using Wabot");
+         await this.sock.sendMessage(jid, { text: `✅ Berhasil menghapus bio bot!` }, { quoted: msg });
+      } else {
+         const bio = body.replace(/^\.?setbotbio\s*/i, "").trim();
+         if (bio) {
+             await this.sock.updateProfileStatus(bio);
+             await this.sock.sendMessage(jid, { text: `✅ Berhasil mengubah bio bot menjadi: ${bio}` }, { quoted: msg });
+         } else {
+             await this.sock.sendMessage(jid, { text: `Masukkan bio, contoh: .setbotbio Bot Aktif!` }, { quoted: msg });
+         }
+      }
+    } else if (body.startsWith(".antivirtex") || body.startsWith("antivirtex") || body.startsWith(".antitoxic") || body.startsWith("antitoxic")) {
+      await this.sock.sendMessage(jid, { text: `🛡️ Fitur anti sedang dalam pengembangan.` }, { quoted: msg });
+    } else if (body.startsWith(".joingc ") || body.startsWith("joingc ") || body.startsWith(".creategc ") || body.startsWith("creategc ") || body.startsWith(".addsticker") || body.startsWith("addsticker") || body.startsWith(".delsticker") || body.startsWith("delsticker")) {
+      if (body.startsWith(".joingc") || body.startsWith("joingc")) {
+         const link = body.replace(/^\.?joingc\s*/i, "").trim();
+         const code = link.split("chat.whatsapp.com/")[1];
+         if (code) {
+             try {
+                 await this.sock.groupAcceptInvite(code);
+                 await this.sock.sendMessage(jid, { text: `✅ Berhasil bergabung ke grup!` }, { quoted: msg });
+             } catch(err) {
+                 await this.sock.sendMessage(jid, { text: `Gagal bergabung. Link mungkin tidak valid.` }, { quoted: msg });
+             }
+         } else {
+             await this.sock.sendMessage(jid, { text: `Kirim link grup! Contoh: .joingc https://chat.whatsapp.com/xxx` }, { quoted: msg });
+         }
+      } else if (body.startsWith(".creategc") || body.startsWith("creategc")) {
+         const name = body.replace(/^\.?creategc\s*/i, "").trim();
+         if (name) {
+             try {
+                await this.sock.groupCreate(name, []);
+                await this.sock.sendMessage(jid, { text: `✅ Berhasil membuat grup *${name}*` }, { quoted: msg });
+             } catch(err) {
+                await this.sock.sendMessage(jid, { text: `Gagal membuat grup.` }, { quoted: msg });
+             }
+         } else {
+             await this.sock.sendMessage(jid, { text: `Kirim nama grup! Contoh: .creategc NamaGrup` }, { quoted: msg });
+         }
+      } else if (body.startsWith(".addsticker") || body.startsWith("addsticker")) {
+         const text = body.split(" ")[1];
+         if (!text) {
+             await this.sock.sendMessage(jid, { text: "Kirim perintah dengan nama stiker, sambil mereply stiker!" }, { quoted: msg });
+         } else {
+             const isQuotedSticker = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage;
+             if (isQuotedSticker) {
+                 const buffer = await downloadMediaMessage(
+                     { message: msg.message.extendedTextMessage.contextInfo.quotedMessage } as any, 
+                     'buffer', 
+                     {}, 
+                     { reuploadRequest: this.sock.updateMediaMessage }
+                 ) as Buffer;
+                 this.storedStickers.set(text, buffer);
+                 await this.sock.sendMessage(jid, { text: `✅ Berhasil menyimpan stiker dengan nama "${text}"` }, { quoted: msg });
+             } else {
+                 await this.sock.sendMessage(jid, { text: "Reply stiker dengan perintah ini!" }, { quoted: msg });
+             }
+         }
+      } else if (body.startsWith(".delsticker") || body.startsWith("delsticker")) {
+         const text = body.split(" ")[1];
+         if (text && this.storedStickers.has(text)) {
+             this.storedStickers.delete(text);
+             await this.sock.sendMessage(jid, { text: `✅ Berhasil menghapus stiker "${text}"` }, { quoted: msg });
+         } else {
+             await this.sock.sendMessage(jid, { text: `Stiker tidak ditemukan!` }, { quoted: msg });
+         }
+      }
     } else if (body.startsWith(".cekpariban") || body.startsWith("cekpariban") || body.startsWith(".cektartulang") || body.startsWith("cektartulang") || body.startsWith(".cektarito") || body.startsWith("cektarito") || body.startsWith(".cekpadan") || body.startsWith("cekpadan")) {
        let cmd = body.split(" ")[0].replace(".", "");
        const argsStr = messageContent.slice(messageContent.toLowerCase().indexOf(cmd) + cmd.length).trim();
@@ -1668,6 +2169,11 @@ export class WhatsAppBot {
           }
        }
        this.broadcastState(`Responded to ${cmd} command`);
+    } else {
+       const potentialCmd = body.replace(/^\.?/, "").trim();
+       if (this.storedStickers.has(potentialCmd)) {
+          await this.sock.sendMessage(jid, { sticker: this.storedStickers.get(potentialCmd) }, { quoted: msg });
+       }
     }
   }
 }

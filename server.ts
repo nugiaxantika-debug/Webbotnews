@@ -97,7 +97,7 @@ async function startServer() {
       return res.status(400).json({ error: "Email sudah terdaftar" });
     }
     
-    const newUser = { email, password, name: "", photo: "" };
+    const newUser = { email, password, name: "", photo: "", registeredAt: Date.now() };
     
     try {
         await setDoc(doc(adminDb, "users", email), newUser);
@@ -164,7 +164,7 @@ async function startServer() {
 
     if (!user) return res.status(404).json({ error: "Not found" });
 
-    res.json({ name: user.name || "", photo: user.photo || "" });
+    res.json({ name: user.name || "", photo: user.photo || "", registeredAt: user.registeredAt || Date.now() });
   });
 
   app.post("/api/user/profile", async (req, res) => {

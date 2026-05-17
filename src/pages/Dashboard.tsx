@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
-import { Activity, Power, RefreshCw, Trash2, Smartphone, ShieldCheck, FileText, Users, Gamepad2, Settings, Clock, LogOut, MoreVertical, X } from "lucide-react";
+import { Activity, Power, RefreshCw, Trash2, Smartphone, ShieldCheck, FileText, Users, Gamepad2, Settings, Clock, LogOut, MoreVertical, X, MessageCircle, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 type BotStatus = "disconnected" | "connecting" | "connected";
@@ -69,8 +69,9 @@ export default function Dashboard() {
   const [showDropdown, setShowDropdown] = useState(false);
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState({ name: "", photo: "" });
+  const [userProfile, setUserProfile] = useState({ name: "", photo: "", registeredAt: 0 });
   const [profileUpdateStatus, setProfileUpdateStatus] = useState<string | null>(null);
+  const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
     if (currentUserEmail) {
@@ -80,7 +81,7 @@ export default function Dashboard() {
       })
       .then(res => res.json())
       .then(data => {
-        if (!data.error) setUserProfile({ name: data.name || "", photo: data.photo || "" });
+        if (!data.error) setUserProfile({ name: data.name || "", photo: data.photo || "", registeredAt: data.registeredAt || 0 });
       })
       .catch(console.error);
     }
@@ -130,8 +131,8 @@ export default function Dashboard() {
     logo: "",
     feature1Title: "Manajemen Grup",
     feature1Desc: "Atur pesan welcome, keluarkan anggota, anti-link, hingga anti-spam secara otomatis dan aman.",
-    feature2Title: "AI & Media",
-    feature2Desc: "Ubah teks jadi stiker (brat), download video TikTok, hingga tanya jawab menggunakan chat AI (gemini).",
+    feature2Title: "Sticker Menu",
+    feature2Desc: "Buat stiker, tingkatkan kualitas gambar (HD), buat stiker teks brat & bratvid, hingga smeme.",
     feature3Title: "Keamanan Ekstra",
     feature3Desc: "Proteksi nomor dari ban dengan delay otomatis, pairing code tanpa QR, dan privasi penuh.",
     pricingTitle: "Pilih Paket Sesuai Kebutuhan Anda",
@@ -193,29 +194,47 @@ export default function Dashboard() {
       .catch(console.error);
   }, []);
 
-  // Simulate auto-disconnect logic
+  const apiCall = async (endpoint: string, body?: any) => {
+    try {
+      const res = await fetch(`/api/whatsapp/${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": currentUserEmail || "default"
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      return await res.json();
+    } catch (err) {
+      console.error(`Error calling ${endpoint}:`, err);
+    }
+  };
+
+  // Simulate auto-disconnect logic based on registeredAt
   useEffect(() => {
-    if (status === "connected") {
-      const connTime = localStorage.getItem("bot_connection_time");
-      if (!connTime) {
-        localStorage.setItem("bot_connection_time", Date.now().toString());
-      } else {
-        // Assume user is on Plan 1 for mock purposes unless admin
-        const autoDisc = webConfig.plan1AutoDisconnect;
-        const days = webConfig.plan1Days;
-        
-        if (autoDisc && days > 0) {
-          const expiresAt = parseInt(connTime) + (days * 24 * 60 * 60 * 1000);
-          if (Date.now() > expiresAt) {
+    if (!isAdmin && userProfile.registeredAt > 0) {
+      const autoDisc = webConfig.plan1AutoDisconnect;
+      const days = webConfig.plan1Days;
+      
+      if (autoDisc && days > 0) {
+        const expiresAt = userProfile.registeredAt + (days * 24 * 60 * 60 * 1000);
+        if (Date.now() > expiresAt) {
+          setIsExpired(true);
+          setDisconnectNotice(`Akses Dashboard Ditutup: Masa aktif paket Anda (${days} hari) telah habis. Silakan perpanjang.`);
+          if (status === "connected" || status === "connecting") {
             apiCall("stop");
-            setDisconnectNotice(`Koneksi otomatis diputus dari sistem: Masa aktif paket Anda (${days} hari) telah habis.`);
-            localStorage.removeItem("bot_connection_time");
-            setLogs(prev => [...prev, { time: new Date().toISOString(), message: `[Sistem] Koneksi otomatis diputus karena masa aktif telah habis.`}]);
+            setLogs(prev => [...prev, { time: new Date().toISOString(), message: `[Sistem] Koneksi dihentikan.`}]);
           }
+        } else {
+          setIsExpired(false);
+          // if previously noticed, reset notice?
+          // setDisconnectNotice(null);
         }
+      } else {
+        setIsExpired(false);
       }
     }
-  }, [status, webConfig]);
+  }, [status, webConfig, userProfile.registeredAt, isAdmin]);
 
   useEffect(() => {
     if (status === "connected") {
@@ -295,22 +314,6 @@ export default function Dashboard() {
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
-
-  const apiCall = async (endpoint: string, body?: any) => {
-    try {
-      const res = await fetch(`/api/whatsapp/${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-email": currentUserEmail || "default"
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      return await res.json();
-    } catch (err) {
-      console.error(`Error calling ${endpoint}:`, err);
-    }
-  };
 
   const handleStart = () => {
     setLogs((prev) => [...prev, { time: new Date().toISOString(), message: "Initiating Start..." }]);
@@ -1338,8 +1341,16 @@ export default function Dashboard() {
             </div>
 
             {/* Actions Card */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
-
+            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg relative">
+              {isExpired && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-900/80 backdrop-blur-sm rounded-2xl">
+                  <div className="text-center p-4">
+                     <ShieldCheck className="w-10 h-10 text-rose-500 mx-auto mb-2" />
+                     <p className="text-rose-400 font-bold">Akses Terkunci</p>
+                     <p className="text-sm text-neutral-400 mt-1">Masa aktif paket Anda telah habis.</p>
+                  </div>
+                </div>
+              )}
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                 <Settings className="w-5 h-5 text-rose-400" /> Kontrol Panel
               </h2>
@@ -1386,7 +1397,15 @@ export default function Dashboard() {
             </div>
 
             {/* Mass Add Members */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg relative">
+              {isExpired && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-900/80 backdrop-blur-sm rounded-2xl">
+                  <div className="text-center p-4">
+                     <ShieldCheck className="w-10 h-10 text-rose-500 mx-auto mb-2" />
+                     <p className="text-rose-400 font-bold">Akses Terkunci</p>
+                  </div>
+                </div>
+              )}
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                 <Users className="w-5 h-5 text-emerald-400" /> Mass Add Anggota Grup
               </h2>
@@ -1470,6 +1489,34 @@ export default function Dashboard() {
                   <div>
                     <h3 className="font-semibold text-white text-sm">.ownermenu</h3>
                     <p className="text-xs text-neutral-400 mt-1">Menu khusus: .addnamabot, .delnamabot, broadcast & manajemen.</p>
+                  </div>
+                </div>
+                <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-start gap-4">
+                  <div className="bg-emerald-500/20 p-2 rounded-lg text-emerald-400 mt-1"><MessageCircle className="w-5 h-5" /></div>
+                  <div>
+                    <h3 className="font-semibold text-white text-sm">.margamenu</h3>
+                    <p className="text-xs text-neutral-400 mt-1">Cek pariban, tartulang, tarito, dan padan menurut adat batak.</p>
+                  </div>
+                </div>
+                <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-start gap-4">
+                  <div className="bg-rose-500/20 p-2 rounded-lg text-rose-400 mt-1"><Video className="w-5 h-5" /></div>
+                  <div>
+                    <h3 className="font-semibold text-white text-sm">.videomenu</h3>
+                    <p className="text-xs text-neutral-400 mt-1">Kumpulan video menarik seperti tiktokgirl, tiktokhot, dll.</p>
+                  </div>
+                </div>
+                <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-start gap-4">
+                  <div className="bg-fuchsia-500/20 p-2 rounded-lg text-fuchsia-400 mt-1"><Gamepad2 className="w-5 h-5" /></div>
+                  <div>
+                    <h3 className="font-semibold text-white text-sm">.stickermenu</h3>
+                    <p className="text-xs text-neutral-400 mt-1">Buat stiker, HD gambar, stiker teks brat & bratvid, smeme.</p>
+                  </div>
+                </div>
+                <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-start gap-4">
+                  <div className="bg-pink-500/20 p-2 rounded-lg text-pink-400 mt-1"><MessageCircle className="w-5 h-5" /></div>
+                  <div>
+                    <h3 className="font-semibold text-white text-sm">.funmenu</h3>
+                    <p className="text-xs text-neutral-400 mt-1">Aneka hiburan lucu (cekkhodam, cekjodoh, ppcouple, dsb).</p>
                   </div>
                 </div>
               </div>
