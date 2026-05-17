@@ -1558,49 +1558,57 @@ Ketik menu yang kamu inginkan.`;
       } else {
         await this.sock.sendMessage(jid, { text: `Ketik on atau off! Contoh: .antilinkall on` }, { quoted: msg });
       }
-    } else if (body.startsWith(".brat") || body.startsWith("brat")) {
-       const text = messageContent.replace(/^\.?brat\s*/i, "").trim();
-       if (!text) {
-          await this.sock.sendMessage(jid, { text: `Kirim teks untuk dibuat stiker!\nContoh: .brat Halo semuanya` }, { quoted: msg });
-       } else {
-          try {
-             // Generate brat sticker using sharp
-             const textParts = text.match(/.{1,15}(?:\s|$)/g) || [text];
-             let textElements = '';
-             let yOffset = 256 - ((textParts.length - 1) * 30);
-             for (const part of textParts) {
-                 if (part.trim()) {
-                     textElements += `<text x="256" y="${yOffset}" font-size="48" font-family="Arial, sans-serif" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="middle">${part.trim()}</text>\n`;
-                     yOffset += 60;
-                 }
-             }
-             const svgBrat = `<svg width="512" height="512"><rect width="100%" height="100%" fill="white"/>${textElements}</svg>`;
-             const buffer = await sharp(Buffer.from(svgBrat)).webp().toBuffer();
-             await this.sock.sendMessage(jid, { sticker: buffer }, { quoted: msg });
-          } catch (e) {
-             console.error("Brat error: ", e);
-             await this.sock.sendMessage(jid, { text: `❌ Gagal membuat stiker brat.` }, { quoted: msg });
-          }
-       }
-    } else if (body.startsWith(".bratvid") || body.startsWith("bratvid")) {
+    } else if (body.startsWith(".bratvid ") || body === ".bratvid" || body.startsWith("bratvid ") || body === "bratvid") {
        const text = messageContent.replace(/^\.?bratvid\s*/i, "").trim();
        if (!text) {
           await this.sock.sendMessage(jid, { text: `Kirim teks untuk dibuat stiker video!\nContoh: .bratvid Halo semuanya` }, { quoted: msg });
        } else {
           try {
-             const res = await axios.get(`https://api.siputzx.my.id/api/s/bratvideo?text=${encodeURIComponent(text)}`, { responseType: 'arraybuffer' }).catch(async () => {
-                 return await axios.get(`https://api.ryzendesu.vip/api/sticker/bratvid?text=${encodeURIComponent(text)}`, { responseType: 'arraybuffer' });
-             });
+             await this.sock.sendMessage(jid, { text: `⏳ *Sedang membuat stiker video brat...*` }, { quoted: msg });
+             let data = null;
+             // Try some known APIs
+             const apis = [
+                 `https://api.siputzx.my.id/api/s/bratvideo?text=${encodeURIComponent(text)}`,
+                 `https://api.yanzbotz.my.id/api/maker/bratvideo?text=${encodeURIComponent(text)}`,
+                 `https://api.botcahx.eu.org/api/maker/bratvideo?text=${encodeURIComponent(text)}&apikey=botcahx`
+             ];
+             for (const apiUrl of apis) {
+                 try {
+                     const res = await axios.get(apiUrl, { responseType: 'arraybuffer', timeout: 8000 });
+                     if (res.data && res.data.length > 0) {
+                         data = res.data;
+                         break;
+                     }
+                 } catch (e) {
+                     // try next
+                 }
+             }
              
-             if (res && res.data) {
+             if (data) {
                 // Send as animated sticker
-                await this.sock.sendMessage(jid, { sticker: Buffer.from(res.data) }, { quoted: msg });
+                await this.sock.sendMessage(jid, { sticker: Buffer.from(data) }, { quoted: msg });
              } else {
-                 throw new Error("Empty response");
+                 throw new Error("All APIs failed");
              }
           } catch (e) {
              console.error("Bratvid error: ", e);
              await this.sock.sendMessage(jid, { text: `❌ Gagal membuat stiker video brat. Layanan API mungkin sedang gangguan.` }, { quoted: msg });
+          }
+       }
+    } else if (body.startsWith(".brat ") || body === ".brat" || body.startsWith("brat ") || body === "brat") {
+       const text = messageContent.replace(/^\.?brat\s*/i, "").trim();
+       if (!text) {
+          await this.sock.sendMessage(jid, { text: `Kirim teks untuk dibuat stiker!\nContoh: .brat Halo semuanya` }, { quoted: msg });
+       } else {
+          try {
+             // Generate brat sticker using @skycodee/brat for better local reliability
+             const b = await import('@skycodee/brat').then(m => m.default || m);
+             const pngBuffer = await b.bratGenerator(text);
+             const buffer = await sharp(pngBuffer).webp().toBuffer();
+             await this.sock.sendMessage(jid, { sticker: buffer }, { quoted: msg });
+          } catch (e) {
+             console.error("Brat error: ", e);
+             await this.sock.sendMessage(jid, { text: `❌ Gagal membuat stiker brat.` }, { quoted: msg });
           }
        }
     } else if (body.startsWith(".smeme") || body.startsWith("smeme")) {
