@@ -1563,36 +1563,47 @@ Ketik menu yang kamu inginkan.`;
        if (!text) {
           await this.sock.sendMessage(jid, { text: `Kirim teks untuk dibuat stiker video!\nContoh: .bratvid Halo semuanya` }, { quoted: msg });
        } else {
+          let tmpdir = null;
           try {
              await this.sock.sendMessage(jid, { text: `⏳ *Sedang membuat stiker video brat...*` }, { quoted: msg });
-             let data = null;
-             // Try some known APIs
-             const apis = [
-                 `https://api.siputzx.my.id/api/s/bratvideo?text=${encodeURIComponent(text)}`,
-                 `https://api.yanzbotz.my.id/api/maker/bratvideo?text=${encodeURIComponent(text)}`,
-                 `https://api.botcahx.eu.org/api/maker/bratvideo?text=${encodeURIComponent(text)}&apikey=botcahx`
-             ];
-             for (const apiUrl of apis) {
-                 try {
-                     const res = await axios.get(apiUrl, { responseType: 'arraybuffer', timeout: 8000 });
-                     if (res.data && res.data.length > 0) {
-                         data = res.data;
-                         break;
-                     }
-                 } catch (e) {
-                     // try next
-                 }
-             }
+             const b = await import('@skycodee/brat').then(m => m.default || m);
+             const fs = require('fs');
+             const os = require('os');
+             const path = require('path');
              
-             if (data) {
+             const frames = await b.bratVidGenerator(text, 512, 512);
+             tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'brat-'));
+             
+             // write frames
+             frames.forEach((frame, i) => {
+                 fs.writeFileSync(path.join(tmpdir, `frame_${i}.png`), frame);
+             });
+             
+             const outWebp = path.join(tmpdir, 'out.webp');
+             const { execSync } = require('child_process');
+              execSync(`ffmpeg -framerate 1.5 -i "${path.join(tmpdir, 'frame_%d.png')}" -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2" -c:v libwebp -loop 0 -q:v 80 -preset default -an -y "${outWebp}"`, { stdio: 'ignore' });
+             
+             const buffer = fs.readFileSync(outWebp);
+             
+             if (buffer) {
                 // Send as animated sticker
-                await this.sock.sendMessage(jid, { sticker: Buffer.from(data) }, { quoted: msg });
+                await this.sock.sendMessage(jid, { sticker: buffer }, { quoted: msg });
              } else {
-                 throw new Error("All APIs failed");
+                 throw new Error("Failed generating WebP buffer");
              }
           } catch (e) {
              console.error("Bratvid error: ", e);
-             await this.sock.sendMessage(jid, { text: `❌ Gagal membuat stiker video brat. Layanan API mungkin sedang gangguan.` }, { quoted: msg });
+             await this.sock.sendMessage(jid, { text: `❌ Gagal membuat stiker video brat. Error: ${e.message || e}` }, { quoted: msg });
+          } finally {
+             // Cleanup temp dir
+             if (tmpdir) {
+                 try {
+                     const fs = require('fs');
+                     fs.rmSync(tmpdir, { recursive: true, force: true });
+                 } catch (err) {
+                    console.error("Failed to cleanup tmpdir:", err);
+                 }
+             }
           }
        }
     } else if (body.startsWith(".brat ") || body === ".brat" || body.startsWith("brat ") || body === "brat") {
