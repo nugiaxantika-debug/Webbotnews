@@ -27,8 +27,6 @@ export class WhatsAppBot {
   private authFolder: string;
   private settingsFile: string;
   private botSettingsFile: string;
-  private channelLink: string | null = null;
-
   private sock: any = null;
   private io: SocketIOServer;
   private status: "disconnected" | "connecting" | "connected" = "disconnected";
@@ -87,14 +85,13 @@ export class WhatsAppBot {
       if (!fs.existsSync(this.botSettingsFile)) return;
       const data = fs.readFileSync(this.botSettingsFile, "utf8");
       const obj = JSON.parse(data);
-      if (obj.channelLink) this.channelLink = obj.channelLink;
     } catch {
       // ignore
     }
   }
 
   private saveBotSettings() {
-    const obj = { channelLink: this.channelLink };
+    const obj = {  };
     fs.writeFileSync(this.botSettingsFile, JSON.stringify(obj, null, 2));
   }
 
@@ -120,10 +117,15 @@ export class WhatsAppBot {
     if (this.status === "connected" && this.connectedAt) {
       uptime = Date.now() - this.connectedAt;
     }
+    let phoneNumber = "";
+    if (this.sock?.user?.id) {
+      phoneNumber = this.sock.user.id.split(":")[0];
+    }
     return {
       status: this.status,
       qr: this.currentQr,
       uptime: uptime,
+      phoneNumber: phoneNumber,
     };
   }
 
@@ -723,7 +725,7 @@ export class WhatsAppBot {
     const isGroup = jid.endsWith("@g.us");
     
     const requestedCmd = body.split(/[\s\n]+/)[0];
-    const ownerCommands = ['.addlinkch', 'addlinkch', '.dellinkch', 'dellinkch', '.ownermenu', 'ownermenu', '.broadcast', 'broadcast', '.restartbot', 'restartbot', '.addpremium', 'addpremium', '.addprem', 'addprem', '.addowner', 'addowner', '.delowner', 'delowner', '.listowner', 'listowner', '.listpremium', 'listpremium', '.delpremium', 'delpremium', '.setbotpp', 'setbotpp', '.setbotname', 'setbotname', '.addnamabot', 'addnamabot', '.delnamabot', 'delnamabot', '.totalfitur', 'totalfitur', '.addprefix', 'addprefix', '.delprefix', 'delprefix', '.listprefix', 'listprefix', '.addpoweredby', 'addpoweredby', '.delpoweredby', 'delpoweredby', '.listpoweredby', 'listpoweredby', '.addcmd', 'addcmd', '.delcmd', 'delcmd', '.listcmd', 'listcmd', '.self', 'self', '.publik', 'publik', '.setcoverbot', 'setcoverbot', '.delcoverbot', 'delcoverbot', '.anticall', 'anticall', '.autotyping', 'autotyping', '.addsewa', 'addsewa', '.delsewa', 'delsewa', '.listsewa', 'listsewa', '.owner', 'owner', '.joingc', 'joingc', '.creategc', 'creategc', '.addsticker', 'addsticker', '.delsticker', 'delsticker'];
+    const ownerCommands = ['.ownermenu', 'ownermenu', '.broadcast', 'broadcast', '.restartbot', 'restartbot', '.addpremium', 'addpremium', '.addprem', 'addprem', '.addowner', 'addowner', '.delowner', 'delowner', '.listowner', 'listowner', '.listpremium', 'listpremium', '.delpremium', 'delpremium', '.setbotpp', 'setbotpp', '.setbotname', 'setbotname', '.addnamabot', 'addnamabot', '.delnamabot', 'delnamabot', '.totalfitur', 'totalfitur', '.addprefix', 'addprefix', '.delprefix', 'delprefix', '.listprefix', 'listprefix', '.addpoweredby', 'addpoweredby', '.delpoweredby', 'delpoweredby', '.listpoweredby', 'listpoweredby', '.addcmd', 'addcmd', '.delcmd', 'delcmd', '.listcmd', 'listcmd', '.self', 'self', '.publik', 'publik', '.setcoverbot', 'setcoverbot', '.delcoverbot', 'delcoverbot', '.anticall', 'anticall', '.autotyping', 'autotyping', '.addsewa', 'addsewa', '.delsewa', 'delsewa', '.listsewa', 'listsewa', '.owner', 'owner', '.joingc', 'joingc', '.creategc', 'creategc', '.addsticker', 'addsticker', '.delsticker', 'delsticker'];
     const groupCommands = ['.groupmenu', 'groupmenu', '.delete', 'delete', '.hidetag', 'hidetag', '.kick', 'kick', '.add', 'add', '.open', 'open', '.close', 'close', '.open2', 'open2', '.close2', 'close2', '.antilinkall', 'antilinkall', '.linkgc', 'linkgc', '.setppgc', 'setppgc', '.delppgc', 'delppgc', '.setwelcome', 'setwelcome', '.setbye', 'setbye', '.welcome', 'welcome', '.goodbye', 'goodbye', '.antitagsw', 'antitagsw', '.antivideo', 'antivideo', '.antifoto', 'antifoto', '.antifoto1x', 'antifoto1x', '.antistiker', 'antistiker', '.antispam', 'antispam', '.setnamegc', 'setnamegc', '.setdescgc', 'setdescgc', '.culikswgc', 'culikswgc', '.culikprofilegc', 'culikprofilegc', '.kickall', 'kickall', '.sewabot', 'sewabot', '.promote', 'promote', '.demote', 'demote', '.werewolf', 'werewolf', '.joinww', 'joinww', '.startww', 'startww', '.mutegc', 'mutegc', '.resetlink', 'resetlink', '.tagall', 'tagall', '.setbotbio', 'setbotbio', '.delbotbio', 'delbotbio', '.antivirtex', 'antivirtex', '.antitoxic', 'antitoxic'];
     const funCommands = ['.funmenu', 'funmenu', '.cekkhodam', 'cekkhodam', '.cekganteng', 'cekganteng', '.cekcantik', 'cekcantik', '.cekjodoh', 'cekjodoh', '.ceklesby', 'ceklesby', '.cekpasangan', 'cekpasangan', '.cekgay', 'cekgay', '.cekhoby', 'cekhoby', '.cekkesetiaan', 'cekkesetiaan', '.jadian', 'jadian', '.kiss', 'kiss', '.quotes', 'quotes', '.avatar', 'avatar', '.ppcouple', 'ppcouple'];
     const margaCommands = ['.margamenu', 'margamenu', '.cekpariban', 'cekpariban', '.cektartulang', 'cektartulang', '.cektarito', 'cektarito', '.cekpadan', 'cekpadan'];
@@ -777,47 +779,10 @@ Ketik menu yang kamu inginkan.`;
       if (this.poweredByText) {
          menu += `\n\n_Powered by ${this.poweredByText}_`;
       }
-      if (this.channelLink) {
-        try {
-          const { generateWAMessageFromContent, proto, generateWAMessage } = await import('@whiskeysockets/baileys');
-          let imageMessage;
-          if (this.coverImageBuffer) {
-             const mediaMsg = await generateWAMessage(jid, { image: this.coverImageBuffer }, { userJid: this.sock.user.id, upload: this.sock.waUploadToServer });
-             imageMessage = mediaMsg.message?.imageMessage;
-          }
-          const ctaMsg = {
-              viewOnceMessage: {
-                  message: {
-                      messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-                      interactiveMessage: proto.Message.InteractiveMessage.create({
-                          body: proto.Message.InteractiveMessage.Body.create({ text: menu }),
-                          footer: proto.Message.InteractiveMessage.Footer.create({ text: " " }),
-                          header: proto.Message.InteractiveMessage.Header.create({ hasMediaAttachment: !!imageMessage, imageMessage: imageMessage || null }),
-                          nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                              buttons: [{
-                                  name: "cta_url",
-                                  buttonParamsJson: JSON.stringify({ display_text: "Lihat saluran", url: this.channelLink, merchant_url: this.channelLink })
-                              }]
-                          })
-                      })
-                  }
-              }
-          };
-          const generatedMsg = generateWAMessageFromContent(jid, ctaMsg, { userJid: this.sock.user.id, quoted: msg });
-          await this.sock.relayMessage(jid, generatedMsg.message, { messageId: generatedMsg.key.id });
-        } catch (e) {
-          if (this.coverImageBuffer) {
-            await this.sock.sendMessage(jid, { image: this.coverImageBuffer, caption: menu }, { quoted: msg });
-          } else {
-            await this.sock.sendMessage(jid, { text: menu }, { quoted: msg });
-          }
-        }
+      if (this.coverImageBuffer) {
+        await this.sock.sendMessage(jid, { image: this.coverImageBuffer, caption: menu }, { quoted: msg });
       } else {
-        if (this.coverImageBuffer) {
-          await this.sock.sendMessage(jid, { image: this.coverImageBuffer, caption: menu }, { quoted: msg });
-        } else {
-          await this.sock.sendMessage(jid, { text: menu }, { quoted: msg });
-        }
+        await this.sock.sendMessage(jid, { text: menu }, { quoted: msg });
       }
       this.broadcastState(`Responded to allmenu command`);
     } else if (body === "groupmenu" || body === ".groupmenu" || body === "group menu" || body === ".group menu") {
@@ -910,8 +875,6 @@ Ketik menu yang kamu inginkan.`;
 │ .addcmd
 │ .delcmd
 │ .listcmd
-│ .addlinkch <link>
-│ .dellinkch
 │ .self / .publik
 │ .setcoverbot / .delcoverbot
 │ .anticall on/off
@@ -927,44 +890,10 @@ Ketik menu yang kamu inginkan.`;
 │ .delsticker - hapus stiker
 │ .totalfitur`;
       
-      if (this.channelLink) {
-        try {
-          const { generateWAMessageFromContent, proto, generateWAMessage } = await import('@whiskeysockets/baileys');
-          let imageMessage;
-          if (this.coverImageBuffer) {
-             const mediaMsg = await generateWAMessage(jid, { image: this.coverImageBuffer }, { userJid: this.sock.user.id, upload: this.sock.waUploadToServer });
-             imageMessage = mediaMsg.message?.imageMessage;
-          }
-          const ctaMsg = {
-              viewOnceMessage: {
-                  message: {
-                      messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-                      interactiveMessage: proto.Message.InteractiveMessage.create({
-                          body: proto.Message.InteractiveMessage.Body.create({ text: ownerText }),
-                          footer: proto.Message.InteractiveMessage.Footer.create({ text: " " }),
-                          header: proto.Message.InteractiveMessage.Header.create({ hasMediaAttachment: !!imageMessage, imageMessage: imageMessage || null }),
-                          nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                              buttons: [{
-                                  name: "cta_url",
-                                  buttonParamsJson: JSON.stringify({ display_text: "Lihat saluran", url: this.channelLink, merchant_url: this.channelLink })
-                              }]
-                          })
-                      })
-                  }
-              }
-          };
-          const generatedMsg = generateWAMessageFromContent(jid, ctaMsg, { userJid: this.sock.user.id, quoted: msg });
-          await this.sock.relayMessage(jid, generatedMsg.message, { messageId: generatedMsg.key.id });
-        } catch (e) {
-          let msgObj: any = { text: ownerText };
-          if (this.coverImageBuffer) msgObj = { image: this.coverImageBuffer, caption: ownerText };
-          await this.sock.sendMessage(jid, msgObj, { quoted: msg });
-        }
-      } else {
-        let msgObj: any = { text: ownerText };
-        if (this.coverImageBuffer) msgObj = { image: this.coverImageBuffer, caption: ownerText };
-        await this.sock.sendMessage(jid, msgObj, { quoted: msg });
-      }
+      let msgObj: any = { text: ownerText };
+      if (this.coverImageBuffer) msgObj = { image: this.coverImageBuffer, caption: ownerText };
+      await this.sock.sendMessage(jid, msgObj, { quoted: msg });
+      
       this.broadcastState(`Responded to ownermenu command`);
     } else if (body.startsWith(".kick") || body.startsWith("kick")) {
       if (!jid.endsWith("@g.us")) {
@@ -1437,21 +1366,6 @@ Ketik menu yang kamu inginkan.`;
     } else if (body === ".self" || body === "self" || body === ".publik" || body === "publik") {
       const mode = body.replace(".", "");
       await this.sock.sendMessage(jid, { text: `✅ Berhasil mengubah mode bot menjadi: ${mode}` }, { quoted: msg });
-    } else if (body.startsWith(".addlinkch") || body.startsWith("addlinkch")) {
-      const match = body.match(/^\.?addlinkch\s+(.+)$/i);
-      if (match && match[1]) {
-         this.channelLink = match[1].trim();
-         this.saveBotSettings();
-         await this.sock.sendMessage(jid, { text: `✅ Berhasil menambahkan link saluran: ${this.channelLink}` }, { quoted: msg });
-      } else {
-         await this.sock.sendMessage(jid, { text: `❌ Kirim link channel, contoh: .addlinkch https://whatsapp.com/channel/xxx` }, { quoted: msg });
-      }
-      this.broadcastState(`Added linkch`);
-    } else if (body.startsWith(".dellinkch") || body.startsWith("dellinkch")) {
-      this.channelLink = null;
-      this.saveBotSettings();
-      await this.sock.sendMessage(jid, { text: `✅ Berhasil menghapus link saluran` }, { quoted: msg });
-      this.broadcastState(`Deleted linkch`);
     } else if (body.startsWith(".setcoverbot") || body.startsWith("setcoverbot")) {
       const isQuotedImage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
       const isImage = msg.message?.imageMessage;

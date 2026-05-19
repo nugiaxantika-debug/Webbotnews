@@ -217,8 +217,17 @@ async function startServer() {
         bots = JSON.parse(fs.readFileSync("active_bots.json", "utf-8"));
       }
     } catch(e) {}
-    res.json({ count: bots.length, bots });
+    
+    const botsDetails = bots.map(email => {
+      if (userBots.has(email)) {
+         return { email, ...userBots.get(email)!.getStatus() };
+      }
+      return { email, status: "disconnected" };
+    });
+    
+    res.json({ count: bots.length, bots: botsDetails });
   });
+
 
   app.get("/api/config", async (req, res) => {
     // Disable caching for configuration completely

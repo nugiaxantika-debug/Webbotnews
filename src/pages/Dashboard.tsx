@@ -40,7 +40,7 @@ export default function Dashboard() {
 
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [totalBots, setTotalBots] = useState<number>(0);
-  const [activeBotEmails, setActiveBotEmails] = useState<string[]>([]);
+  const [activeBotsInfo, setActiveBotsInfo] = useState<any[]>([]);
   const [adminDeleting, setAdminDeleting] = useState<string | null>(null);
 
   const fetchAdminData = () => {
@@ -55,7 +55,7 @@ export default function Dashboard() {
         .then(res => res.json())
         .then(data => {
            setTotalBots(data.count || 0);
-           setActiveBotEmails(data.bots || []);
+           setActiveBotsInfo(data.bots || []);
         })
         .catch(err => console.error(err));
     }
@@ -1554,26 +1554,29 @@ export default function Dashboard() {
                     </button>
                   </div>
                   
-                  {activeBotEmails.length > 0 ? (
+                  {activeBotsInfo.length > 0 ? (
                     <div className="space-y-2">
-                       {activeBotEmails.map((email, idx) => (
+                       {activeBotsInfo.map((bot, idx) => (
                           <div key={idx} className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                <span className="relative flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                {bot.status === "connected" && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                                <span className={`relative inline-flex rounded-full h-3 w-3 ${bot.status === "connected" ? "bg-emerald-500" : "bg-rose-500"}`}></span>
                               </span>
                               <div>
-                                <p className="text-sm font-medium text-white">{email}</p>
-                                <p className="text-xs text-neutral-500">Bot Session Active</p>
+                                <p className="text-sm font-medium text-white">{bot.email}</p>
+                                <p className="text-xs text-neutral-500 flex items-center gap-2">
+                                  <span>{bot.status === "connected" ? "Aktif" : bot.status === "connecting" ? "Menghubungkan" : "Terputus"}</span>
+                                  {bot.phoneNumber && <span className="px-1.5 py-0.5 bg-neutral-800 rounded font-mono text-[10px] text-white">+{bot.phoneNumber}</span>}
+                                </p>
                               </div>
                             </div>
                             <button 
-                              onClick={() => handleAdminDeleteSession(email)}
-                              disabled={adminDeleting === email}
+                              onClick={() => handleAdminDeleteSession(bot.email)}
+                              disabled={adminDeleting === bot.email}
                               className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg transition-colors border border-rose-500/30 disabled:opacity-50"
                             >
-                              {adminDeleting === email ? "Memutus..." : "Putuskan Sesi"}
+                              {adminDeleting === bot.email ? "Memutus..." : "Putuskan Sesi"}
                             </button>
                           </div>
                        ))}
