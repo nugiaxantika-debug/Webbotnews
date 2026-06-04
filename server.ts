@@ -424,6 +424,11 @@ async function startServer() {
                      body: "Pengguna baru mengirim bukti pembayaran premium dan menunggu verifikasi."
                   },
                   data: { txId },
+                  webpush: {
+                     fcmOptions: {
+                        link: "/"
+                     }
+                  },
                   tokens: tokens
                };
                admin.messaging().sendEachForMulticast(message)

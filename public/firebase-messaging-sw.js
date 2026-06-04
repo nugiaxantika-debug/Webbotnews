@@ -15,9 +15,15 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   
-  const notificationTitle = payload.notification?.title || payload.data?.title || 'Notifikasi Baru';
+  if (payload.notification) {
+    // If notification payload exists, Firebase will automatically display it.
+    // We don't need to manually call showNotification here.
+    return;
+  }
+
+  const notificationTitle = payload.data?.title || 'Notifikasi Baru';
   const notificationOptions = {
-    body: payload.notification?.body || payload.data?.body || '',
+    body: payload.data?.body || '',
     icon: '/vite.svg',
     data: payload.data
   };

@@ -85,8 +85,7 @@ export default function Dashboard() {
             console.log('SW registered', registration);
             const vapidKey = import.meta.env.VITE_FCM_VAPID_KEY;
             
-            Notification.requestPermission().then((permission) => {
-              if (permission === 'granted') {
+            if (Notification.permission === 'granted') {
                 getToken(messaging, { vapidKey, serviceWorkerRegistration: registration })
                   .then((currentToken) => {
                     if (currentToken) {
@@ -102,8 +101,7 @@ export default function Dashboard() {
                     }
                   })
                   .catch((err) => console.log('An error occurred while retrieving token.', err));
-              }
-            });
+            }
           }).catch((err) => console.log('SW registration failed', err));
       }
       
@@ -1785,6 +1783,53 @@ export default function Dashboard() {
             {/* Admin Web Control */}
             {isAdmin && (
               <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-lg overflow-hidden">
+                {("Notification" in window) && Notification.permission !== 'granted' && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 p-4 mx-6 mt-6 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-amber-400 font-bold mb-1 flex items-center gap-2">⚠️ Notifikasi Push Belum Aktif</h3>
+                      <p className="text-sm text-neutral-400">Aktifkan notifikasi agar ponsel Anda berdering saat ada pembayaran masuk.</p>
+                    </div>
+                    <button 
+                      onClick={async () => {
+                        try {
+                          const permission = await Notification.requestPermission();
+                          if (permission === 'granted') {
+                            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                            const vapidKey = import.meta.env.VITE_FCM_VAPID_KEY;
+                            if (!vapidKey) {
+                              alert("VITE_FCM_VAPID_KEY belum di-set di environment variables.");
+                              return;
+                            }
+                            const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+                            if (currentToken) {
+                              const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+                              await fetch(`${apiBaseURL}/api/admin/fcm-token`, {
+                                method: 'POST',
+                                headers: { 
+                                  'Content-Type': 'application/json',
+                                  'x-user-email': currentUserEmail || ''
+                                },
+                                body: JSON.stringify({ token: currentToken })
+                              });
+                              alert("Notifikasi berhasil diaktifkan!");
+                              window.location.reload();
+                            } else {
+                              alert("Gagal mendapatkan token perangkat.");
+                            }
+                          } else {
+                            alert("Izin diblokir. Silakan izinkan notifikasi dari pengaturan browser (icon gembok di sebelah URL).");
+                          }
+                        } catch (err: any) {
+                          console.error(err);
+                          alert("Terjadi kesalahan: " + err.message);
+                        }
+                      }}
+                      className="whitespace-nowrap bg-amber-500 hover:bg-amber-600 text-neutral-950 px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
+                    >
+                      Aktifkan Notifikasi Mobile
+                    </button>
+                  </div>
+                )}
                 <div className="flex border-b border-neutral-800 bg-neutral-950/50">
                   <button onClick={() => setActiveAdminTab("dashboard")} className={`flex-1 py-4 text-sm font-semibold transition-colors ${activeAdminTab === 'dashboard' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-neutral-500 hover:text-neutral-300'}`}>
                     Dashboard
