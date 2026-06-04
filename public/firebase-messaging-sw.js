@@ -2,11 +2,11 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-  projectId: "jadibotvip",
-  appId: "1:108677295600:web:b6d680ba33479218bd0135",
-  apiKey: "AIzaSyCyBfAPSumISwLzBtLCtl7TLspOLjBo9sE",
-  authDomain: "jadibotvip.firebaseapp.com",
-  messagingSenderId: "108677295600"
+  projectId: "gen-lang-client-0502808507",
+  appId: "1:339012345571:web:5639b4e48c5e199b4befd6",
+  apiKey: "AIzaSyBf5Bkmfoz4id0kv37kTWLrZPGa7WW147g",
+  authDomain: "gen-lang-client-0502808507.firebaseapp.com",
+  messagingSenderId: "339012345571"
 };
 
 firebase.initializeApp(firebaseConfig);
