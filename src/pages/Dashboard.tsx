@@ -3,6 +3,8 @@ import { io, Socket } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
 import { Activity, Power, RefreshCw, Trash2, Smartphone, ShieldCheck, FileText, Users, Gamepad2, Settings, Clock, LogOut, MoreVertical, X, MessageCircle, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { messaging } from "../lib/firebase";
+import { getToken, onMessage } from "firebase/messaging";
 
 type BotStatus = "disconnected" | "connecting" | "connected";
 
@@ -74,6 +76,44 @@ export default function Dashboard() {
 
   const [activeAdminTab, setActiveAdminTab] = useState<"dashboard" | "payments">("dashboard");
   const [payments, setPayments] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          .then((registration) => {
+            console.log('SW registered', registration);
+            const vapidKey = import.meta.env.VITE_FCM_VAPID_KEY;
+            
+            Notification.requestPermission().then((permission) => {
+              if (permission === 'granted') {
+                getToken(messaging, { vapidKey, serviceWorkerRegistration: registration })
+                  .then((currentToken) => {
+                    if (currentToken) {
+                      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+                      fetch(`${apiBaseURL}/api/admin/fcm-token`, {
+                        method: 'POST',
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          'x-user-email': currentUserEmail || ''
+                        },
+                        body: JSON.stringify({ token: currentToken })
+                      }).catch(console.error);
+                    }
+                  })
+                  .catch((err) => console.log('An error occurred while retrieving token.', err));
+              }
+            });
+          }).catch((err) => console.log('SW registration failed', err));
+      }
+      
+      onMessage(messaging, (payload) => {
+        console.log('Message received. ', payload);
+        alert(`🔔 ${payload.notification?.title}\n${payload.notification?.body}`);
+        fetchAdminData();
+      });
+    }
+  }, [isAdmin, currentUserEmail]);
   const [paymentSearch, setPaymentSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
@@ -599,8 +639,8 @@ export default function Dashboard() {
                    <p className="text-sm text-white mt-1">{selectedPayment.status}</p>
                  </div>
                  <div>
-                   <p className="text-xs text-neutral-400">Username</p>
-                   <p className="text-sm text-white mt-1">{selectedPayment.username}</p>
+                   <p className="text-xs text-neutral-400">Email Akun</p>
+                   <p className="text-sm text-white mt-1">{selectedPayment.email}</p>
                  </div>
                  <div>
                    <p className="text-xs text-neutral-400">No. WhatsApp</p>
@@ -1557,11 +1597,6 @@ export default function Dashboard() {
                     <p className="text-sm text-neutral-400 mt-1">Anda menggunakan paket Standar (Gratis).</p>
                   )}
                 </div>
-                {!userProfile.premiumStatus && (
-                  <button onClick={() => navigate("/#pricing")} className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold px-4 py-2 rounded-xl text-sm transition-colors shadow-lg">
-                    Upgrade Premium
-                  </button>
-                )}
               </div>
             )}
 
@@ -1859,7 +1894,7 @@ export default function Dashboard() {
                           <thead className="bg-neutral-950/50 border-b border-neutral-800 text-neutral-400">
                             <tr>
                               <th className="px-4 py-3 font-medium">ID Transaksi</th>
-                              <th className="px-4 py-3 font-medium">Username</th>
+                              <th className="px-4 py-3 font-medium">Email</th>
                               <th className="px-4 py-3 font-medium">No. WhatsApp</th>
                               <th className="px-4 py-3 font-medium">Paket</th>
                               <th className="px-4 py-3 font-medium">Tanggal</th>
@@ -1870,11 +1905,11 @@ export default function Dashboard() {
                           <tbody className="divide-y divide-neutral-800">
                             {payments.filter(p => 
                               (paymentFilter === "all" || p.status === paymentFilter) &&
-                              (p.username.toLowerCase().includes(paymentSearch.toLowerCase()) || p.phone.includes(paymentSearch))
+                              ((p.email && p.email.toLowerCase().includes(paymentSearch.toLowerCase())) || p.phone.includes(paymentSearch))
                             ).map((p, idx) => (
                               <tr key={idx} className="hover:bg-neutral-800/30">
                                 <td className="px-4 py-3 font-mono text-xs text-neutral-300">{p.txId}</td>
-                                <td className="px-4 py-3 text-white">{p.username}</td>
+                                <td className="px-4 py-3 text-white">{p.email || p.username}</td>
                                 <td className="px-4 py-3 text-neutral-300">{p.phone}</td>
                                 <td className="px-4 py-3 text-amber-400">{p.planName}</td>
                                 <td className="px-4 py-3 text-neutral-400">{new Date(p.createdAt).toLocaleString()}</td>

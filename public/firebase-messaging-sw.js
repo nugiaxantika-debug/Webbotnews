@@ -1,0 +1,43 @@
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+
+const firebaseConfig = {
+  projectId: "gen-lang-client-0502808507",
+  appId: "1:339012345571:web:5639b4e48c5e199b4befd6",
+  apiKey: "AIzaSyBf5Bkmfoz4id0kv37kTWLrZPGa7WW147g",
+  authDomain: "gen-lang-client-0502808507.firebaseapp.com",
+  messagingSenderId: "339012345571"
+};
+
+firebase.initializeApp(firebaseConfig);
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Received background message ', payload);
+  
+  const notificationTitle = payload.notification?.title || payload.data?.title || 'Notifikasi Baru';
+  const notificationOptions = {
+    body: payload.notification?.body || payload.data?.body || '',
+    icon: '/vite.svg',
+    data: payload.data
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow('/');
+      }
+    })
+  );
+});

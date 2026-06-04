@@ -9,6 +9,7 @@ import { dirname } from "path";
 import { WhatsAppBot } from "./src/services/whatsapp";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, getDoc, setDoc, getDocs, getCountFromServer } from "firebase/firestore";
+import admin from 'firebase-admin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,6 +17,20 @@ const __dirname = dirname(__filename);
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
 const adminApp = initializeApp(firebaseConfig);
 const adminDb = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
+
+// Initialize Firebase Admin SDK using Environment Variables (Service Account)
+if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+    })
+  });
+  console.log("Firebase Admin SDK initialized successfully");
+} else {
+  console.warn("Firebase Admin SDK not initialized: Missing service account environment variables");
+}
 
 process.on('uncaughtException', (err) => {
   console.error("Uncaught Exception:", err);
@@ -351,9 +366,9 @@ async function startServer() {
   // Premium DANA Manual Payment
   app.post("/api/payment/dana/submit", async (req, res) => {
     try {
-      const { name, username, phone, planName, planPrice, screenshot } = req.body;
+      const { name, email, phone, planName, planPrice, screenshot } = req.body;
       
-      if (!name || !username || !phone || !screenshot) {
+      if (!name || !email || !phone || !screenshot) {
         return res.status(400).json({ error: "All fields and screenshot are required" });
       }
 
@@ -383,7 +398,7 @@ async function startServer() {
       const paymentData = {
         txId,
         name,
-        username,
+        email,
         phone,
         planName,
         planPrice,
@@ -402,23 +417,20 @@ async function startServer() {
         const tokensSnap = await getDoc(doc(adminDb, "settings", "fcm_tokens"));
         if (tokensSnap.exists()) {
            const tokens = tokensSnap.data().tokens || [];
-           if (tokens.length > 0 && process.env.FCM_SERVER_KEY) {
-              const fetch = (await import('node-fetch')).default || global.fetch;
-              await fetch('https://fcm.googleapis.com/fcm/send', {
-                 method: 'POST',
-                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `key=${process.env.FCM_SERVER_KEY}`
-                 },
-                 body: JSON.stringify({
-                    registration_ids: tokens,
-                    notification: {
-                       title: "🔔 Pembayaran Baru",
-                       body: "Pengguna baru mengirim bukti pembayaran premium dan menunggu verifikasi."
-                    },
-                    data: { txId }
-                 })
-              });
+           if (tokens.length > 0 && admin.apps.length > 0) {
+               const message = {
+                  notification: {
+                     title: "🔔 Pembayaran Baru",
+                     body: "Pengguna baru mengirim bukti pembayaran premium dan menunggu verifikasi."
+                  },
+                  data: { txId },
+                  tokens: tokens
+               };
+               admin.messaging().sendEachForMulticast(message)
+                  .then((response) => {
+                     console.log(response.successCount + ' messages were sent successfully via Admin SDK');
+                  })
+                  .catch((err) => console.error("Admin SDK send failure:", err));
            }
         }
       } catch (fcmErr) {
@@ -472,7 +484,7 @@ async function startServer() {
       await setDoc(paymentRef, updateData, { merge: true });
 
       if (action === "accept") {
-         const userEmail = paymentData.username; // Assuming username field contains email
+         const userEmail = paymentData.email; // Assuming email field contains email
          const userRef = doc(adminDb, "users", userEmail);
          const userSnap = await getDoc(userRef);
          if (userSnap.exists()) {
@@ -510,13 +522,37 @@ async function startServer() {
     }
   });
   
+  // Admin FCM Token endpoint
+  app.post("/api/admin/fcm-token", async (req, res) => {
+    let currentUser = req.headers["x-user-email"] as string;
+    if (currentUser !== "nugiaxantika@gmail.com") return res.status(403).json({ error: "Forbidden" });
+    try {
+      const { token } = req.body;
+      if (!token) return res.status(400).json({ error: "Token is required" });
+      
+      const docRef = doc(adminDb, "settings", "fcm_tokens");
+      const snap = await getDoc(docRef);
+      let tokens: string[] = [];
+      if (snap.exists()) {
+        tokens = snap.data().tokens || [];
+      }
+      if (!tokens.includes(token)) {
+        tokens.push(token);
+        await setDoc(docRef, { tokens }, { merge: true });
+      }
+      res.json({ success: true });
+    } catch(err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get("/api/user/payments", async (req, res) => {
     let currentUser = req.headers["x-user-email"] as string;
     if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
     try {
-      // Find payments where username === currentUser
+      // Find payments where email === currentUser
       const snap = await getDocs(collection(adminDb, "payments"));
-      const payments = snap.docs.map(d => d.data()).filter(p => p.username === currentUser);
+      const payments = snap.docs.map(d => d.data()).filter(p => p.email === currentUser);
       payments.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       res.json({ success: true, payments });
     } catch (err: any) {

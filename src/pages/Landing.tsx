@@ -86,7 +86,7 @@ export default function Landing() {
   const [checkoutStep, setCheckoutStep] = useState<"checkout" | "confirm">("checkout");
   const [checkoutData, setCheckoutData] = useState({
     name: "",
-    username: "",
+    email: "",
     phone: ""
   });
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export default function Landing() {
   const openPaymentModal = () => {
     setIsPaymentModalOpen(true);
     setCheckoutStep("checkout");
-    setCheckoutData({ name: "", username: "", phone: "" });
+    setCheckoutData({ name: "", email: "", phone: "" });
     setScreenshotPreview(null);
   };
 
@@ -142,7 +142,7 @@ export default function Landing() {
            headers: { "Content-Type": "application/json" },
            body: JSON.stringify({
               name: checkoutData.name,
-              username: checkoutData.username,
+              email: checkoutData.email,
               phone: checkoutData.phone,
               planName: webConfig.plan2Name,
               planPrice: webConfig.plan2Price,
@@ -727,14 +727,14 @@ export default function Landing() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                      <div>
-                       <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">Username</label>
+                       <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">Email Akun (Login)</label>
                        <input 
-                         type="text" 
+                         type="email" 
                          required
-                         value={checkoutData.username}
-                         onChange={e => setCheckoutData({...checkoutData, username: e.target.value})}
+                         value={checkoutData.email}
+                         onChange={e => setCheckoutData({...checkoutData, email: e.target.value})}
                          className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-neutral-900 dark:text-white focus:outline-none focus:border-amber-500 transition-colors"
-                         placeholder="Username login"
+                         placeholder="emailanda@gmail.com"
                        />
                      </div>
                      <div>
