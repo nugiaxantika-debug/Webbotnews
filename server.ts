@@ -47,6 +47,7 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
   
 
@@ -164,7 +165,33 @@ async function startServer() {
 
     if (!user) return res.status(404).json({ error: "Not found" });
 
-    res.json({ name: user.name || "", photo: user.photo || "", registeredAt: user.registeredAt || Date.now() });
+    // Cek kadaluarsa premium
+    if (user.premiumStatus && user.premiumEnd) {
+       if (new Date(user.premiumEnd).getTime() <= Date.now()) {
+          user.premiumStatus = false;
+          try {
+             await setDoc(doc(adminDb, "users", email), { premiumStatus: false }, { merge: true });
+          } catch(e) {}
+          if (fs.existsSync("auth.json")) {
+             let users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+             const idx = users.findIndex((u: any) => u.email === email);
+             if (idx > -1) {
+                users[idx].premiumStatus = false;
+                fs.writeFileSync("auth.json", JSON.stringify(users, null, 2));
+             }
+          }
+       }
+    }
+
+    res.json({ 
+      name: user.name || "", 
+      photo: user.photo || "", 
+      registeredAt: user.registeredAt || Date.now(),
+      premiumStatus: user.premiumStatus || false,
+      premiumPlan: user.premiumPlan || "",
+      premiumStart: user.premiumStart || "",
+      premiumEnd: user.premiumEnd || ""
+    });
   });
 
   app.post("/api/user/profile", async (req, res) => {
@@ -316,6 +343,182 @@ async function startServer() {
     try {
       const groups = await getWaBot(req).getGroups();
       res.json({ success: true, groups });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Premium DANA Manual Payment
+  app.post("/api/payment/dana/submit", async (req, res) => {
+    try {
+      const { name, username, phone, planName, planPrice, screenshot } = req.body;
+      
+      if (!name || !username || !phone || !screenshot) {
+        return res.status(400).json({ error: "All fields and screenshot are required" });
+      }
+
+      // Simpan file bukti pembayaran pada folder terpisah
+      let screenshotUrl = screenshot;
+      if (screenshot.startsWith("data:image")) {
+        const matches = screenshot.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+           const type = matches[1];
+           const buffer = Buffer.from(matches[2], 'base64');
+           const ext = type.split('/')[1] === 'jpeg' ? 'jpg' : type.split('/')[1];
+           const filename = `payment_${Date.now()}_${Math.floor(Math.random() * 1000)}.${ext}`;
+           const uploadDir = path.join(process.cwd(), "public", "uploads");
+           if (!fs.existsSync(uploadDir)) {
+              fs.mkdirSync(uploadDir, { recursive: true });
+           }
+           fs.writeFileSync(path.join(uploadDir, filename), buffer);
+           screenshotUrl = `/uploads/${filename}`;
+        }
+      }
+
+      // Format: TRX-YYYYMMDD-XXXX
+      const dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
+      const randomStr = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+      const txId = `TRX-${dateStr}-${randomStr}`;
+
+      const paymentData = {
+        txId,
+        name,
+        username,
+        phone,
+        planName,
+        planPrice,
+        screenshot: screenshotUrl,
+        status: "Menunggu Verifikasi",
+        createdAt: new Date().toISOString()
+      };
+
+      // Save to Firestore
+      await setDoc(doc(adminDb, "payments", txId), paymentData);
+
+      // Trigger Push Notification Admin
+      // Fire and forget FCM message to all admin device tokens
+      // Admin tokens could be stored in a 'settings/fcm_tokens' doc or 'admin_tokens' collection.
+      try {
+        const tokensSnap = await getDoc(doc(adminDb, "settings", "fcm_tokens"));
+        if (tokensSnap.exists()) {
+           const tokens = tokensSnap.data().tokens || [];
+           if (tokens.length > 0 && process.env.FCM_SERVER_KEY) {
+              const fetch = (await import('node-fetch')).default || global.fetch;
+              await fetch('https://fcm.googleapis.com/fcm/send', {
+                 method: 'POST',
+                 headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `key=${process.env.FCM_SERVER_KEY}`
+                 },
+                 body: JSON.stringify({
+                    registration_ids: tokens,
+                    notification: {
+                       title: "🔔 Pembayaran Baru",
+                       body: "Pengguna baru mengirim bukti pembayaran premium dan menunggu verifikasi."
+                    },
+                    data: { txId }
+                 })
+              });
+           }
+        }
+      } catch (fcmErr) {
+        console.error("Failed to send FCM notification:", fcmErr);
+      }
+
+      res.json({ success: true, txId });
+    } catch (err: any) {
+      console.error("Payment submit error:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Premium Payment Management (Admin)
+  app.get("/api/admin/payments", async (req, res) => {
+    let currentUser = req.headers["x-user-email"] as string;
+    if (currentUser !== "nugiaxantika@gmail.com") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const snap = await getDocs(collection(adminDb, "payments"));
+      const payments = snap.docs.map(d => d.data());
+      payments.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json({ success: true, payments });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/admin/payments/action", async (req, res) => {
+    let currentUser = req.headers["x-user-email"] as string;
+    if (currentUser !== "nugiaxantika@gmail.com") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const { txId, action, reason } = req.body;
+      const paymentRef = doc(adminDb, "payments", txId);
+      const snap = await getDoc(paymentRef);
+      if (!snap.exists()) return res.status(404).json({ error: "Payment not found" });
+      const paymentData = snap.data();
+      
+      const updateData: any = {
+        status: action === "accept" ? "Diterima" : "Ditolak",
+        verifiedAt: new Date().toISOString(),
+        verifiedBy: currentUser
+      };
+      if (action === "reject" && reason) {
+        updateData.rejectReason = reason;
+      }
+      
+      await setDoc(paymentRef, updateData, { merge: true });
+
+      if (action === "accept") {
+         const userEmail = paymentData.username; // Assuming username field contains email
+         const userRef = doc(adminDb, "users", userEmail);
+         const userSnap = await getDoc(userRef);
+         if (userSnap.exists()) {
+             const now = new Date();
+             const end = new Date(now);
+             end.setDate(end.getDate() + 30); // Assume 30 days for VIP, or use webConfig
+             await setDoc(userRef, {
+                 premiumStatus: true,
+                 premiumPlan: paymentData.planName,
+                 premiumStart: now.toISOString(),
+                 premiumEnd: end.toISOString()
+             }, { merge: true });
+         } else {
+             // Fallback to local auth.json if not in Firestore
+             if (fs.existsSync("auth.json")) {
+                 let users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+                 const uIdx = users.findIndex((u: any) => u.email === userEmail);
+                 if (uIdx !== -1) {
+                     const now = new Date();
+                     const end = new Date(now);
+                     end.setDate(end.getDate() + 30);
+                     users[uIdx].premiumStatus = true;
+                     users[uIdx].premiumPlan = paymentData.planName;
+                     users[uIdx].premiumStart = now.toISOString();
+                     users[uIdx].premiumEnd = end.toISOString();
+                     fs.writeFileSync("auth.json", JSON.stringify(users, null, 2));
+                 }
+             }
+         }
+      }
+
+      res.json({ success: true, txId });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  app.get("/api/user/payments", async (req, res) => {
+    let currentUser = req.headers["x-user-email"] as string;
+    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      // Find payments where username === currentUser
+      const snap = await getDocs(collection(adminDb, "payments"));
+      const payments = snap.docs.map(d => d.data()).filter(p => p.username === currentUser);
+      payments.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json({ success: true, payments });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

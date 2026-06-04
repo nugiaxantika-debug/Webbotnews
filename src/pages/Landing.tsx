@@ -79,6 +79,91 @@ export default function Landing() {
   const [isChatTyping, setIsChatTyping] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentChannels, setPaymentChannels] = useState<any[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<string>("");
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<"checkout" | "confirm">("checkout");
+  const [checkoutData, setCheckoutData] = useState({
+    name: "",
+    username: "",
+    phone: ""
+  });
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+
+  const openPaymentModal = () => {
+    setIsPaymentModalOpen(true);
+    setCheckoutStep("checkout");
+    setCheckoutData({ name: "", username: "", phone: "" });
+    setScreenshotPreview(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/jpg", "image/webp"].includes(file.type)) {
+      alert("Hanya format JPG, JPEG, PNG, dan WEBP yang diperbolehkan.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran file maksimal 5 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (ev.target?.result) {
+        setScreenshotPreview(ev.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (checkoutStep === "checkout") {
+      window.open("https://link.dana.id/minta?full_url=https://qr.dana.id/v1/281012092026060434529470", "_blank");
+      setCheckoutStep("confirm");
+      return;
+    }
+
+    if (checkoutStep === "confirm") {
+      if (!screenshotPreview) {
+        alert("Silakan upload screenshot bukti pembayaran.");
+        return;
+      }
+      setIsCheckingOut(true);
+      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+      try {
+        const res = await fetch(`${apiBaseURL}/api/payment/dana/submit`, {
+           method: "POST",
+           headers: { "Content-Type": "application/json" },
+           body: JSON.stringify({
+              name: checkoutData.name,
+              username: checkoutData.username,
+              phone: checkoutData.phone,
+              planName: webConfig.plan2Name,
+              planPrice: webConfig.plan2Price,
+              screenshot: screenshotPreview,
+           })
+        });
+        const data = await res.json();
+        if (data.success) {
+           alert("Terima kasih! Bukti pembayaran berhasil dikirim dan sedang menunggu verifikasi admin.");
+           setIsPaymentModalOpen(false);
+        } else {
+           alert("Gagal mengirim pembayaran: " + (data.message || data.error || "Unknown Error"));
+        }
+      } catch (err) {
+        alert("Terjadi kesalahan sistem saat mengirim form konfirmasi.");
+      } finally {
+        setIsCheckingOut(false);
+      }
+    }
+  };
+
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const toggleChat = () => {
@@ -362,14 +447,12 @@ export default function Landing() {
                 </li>
               ))}
             </ul>
-            <a 
-              href={`https://wa.me/${webConfig.contactPhone.replace(/\D/g, '')}?text=Halo%20Admin,%20saya%20ingin%20berlangganan%20${encodeURIComponent(webConfig.plan2Name)}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button 
+              onClick={openPaymentModal}
               className="w-full text-center block bg-amber-500 text-neutral-950 py-4 rounded-xl font-bold hover:bg-amber-600 transition-colors"
             >
               {webConfig.plan2ButtonText}
-            </a>
+            </button>
           </div>
         </div>
       </section>
@@ -594,6 +677,114 @@ export default function Landing() {
                 {isRegisterMode ? webConfig.registerLoginText || "Sudah punya akun? Masuk" : webConfig.loginRegisterText || "Belum punya akun? Daftar"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isPaymentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-500/80 dark:bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-3xl p-8 max-w-lg w-full shadow-2xl animate-in zoom-in-95 duration-200 relative max-h-[90vh] overflow-y-auto">
+            <button 
+              onClick={() => setIsPaymentModalOpen(false)}
+              className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-900 dark:text-white pb-2"
+            >
+              ✕
+            </button>
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2 pb-2 border-b border-neutral-200 dark:border-neutral-800">
+              Checkout - {webConfig.plan2Name}
+            </h2>
+            <div className="flex justify-between items-center mb-6">
+               <span className="text-neutral-600 dark:text-neutral-400 font-medium">Total Pembayaran</span>
+               <span className="text-xl font-bold text-amber-500">{webConfig.plan2Price}</span>
+            </div>
+
+            <form onSubmit={handleCheckoutSubmit} className="space-y-4">
+              {checkoutStep === "checkout" ? (
+                <>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4 whitespace-pre-wrap leading-relaxed">
+                    Deskripsi Paket:<br/>
+                    {webConfig.plan2Features}
+                  </p>
+                  <button 
+                    type="submit"
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold py-4 rounded-xl transition-colors mt-6 flex justify-center items-center gap-2"
+                  >
+                    Bayar Sekarang
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">Nama Pengguna</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={checkoutData.name}
+                      onChange={e => setCheckoutData({...checkoutData, name: e.target.value})}
+                      className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-neutral-900 dark:text-white focus:outline-none focus:border-amber-500 transition-colors"
+                      placeholder="Nama Lengkap Anda"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">Username</label>
+                       <input 
+                         type="text" 
+                         required
+                         value={checkoutData.username}
+                         onChange={e => setCheckoutData({...checkoutData, username: e.target.value})}
+                         className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-neutral-900 dark:text-white focus:outline-none focus:border-amber-500 transition-colors"
+                         placeholder="Username login"
+                       />
+                     </div>
+                     <div>
+                       <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">Nomor WhatsApp</label>
+                       <input 
+                         type="text" 
+                         required
+                         value={checkoutData.phone}
+                         onChange={e => setCheckoutData({...checkoutData, phone: e.target.value})}
+                         className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-neutral-900 dark:text-white focus:outline-none focus:border-amber-500 transition-colors"
+                         placeholder="081234567890"
+                       />
+                     </div>
+                  </div>
+                  
+                  <div>
+                     <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">Paket Premium (Otomatis)</label>
+                     <input 
+                       type="text" 
+                       readOnly
+                       value={webConfig.plan2Name}
+                       className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl px-4 py-3 text-neutral-500 dark:text-neutral-400 cursor-not-allowed"
+                     />
+                  </div>
+
+                  <div>
+                     <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-1.5 block">Upload Screenshot Bukti Pembayaran</label>
+                     <input 
+                       type="file" 
+                       accept="image/jpeg, image/png, image/jpg, image/webp"
+                       required
+                       onChange={handleFileChange}
+                       className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-xl px-4 py-3 text-neutral-900 dark:text-white focus:outline-none focus:border-amber-500 transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-neutral-900 hover:file:bg-amber-600"
+                     />
+                     <p className="text-xs text-neutral-500 mt-2">Format: JPG, JPEG, PNG, WEBP. Maks 5MB.</p>
+                     {screenshotPreview && (
+                       <img src={screenshotPreview} alt="Preview" className="mt-4 rounded-xl border border-neutral-200 dark:border-neutral-800 max-h-40 object-contain mx-auto" />
+                     )}
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={isCheckingOut}
+                    className="w-full bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-600 text-neutral-950 font-bold py-4 rounded-xl transition-colors mt-6"
+                  >
+                    {isCheckingOut ? "Mengirim..." : "Kirim Konfirmasi Pembayaran"}
+                  </button>
+                </>
+              )}
+            </form>
           </div>
         </div>
       )}

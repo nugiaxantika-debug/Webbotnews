@@ -58,7 +58,46 @@ export default function Dashboard() {
            setActiveBotsInfo(data.bots || []);
         })
         .catch(err => console.error(err));
+        
+      fetch(`${apiBaseURL}/api/admin/payments`, {
+        headers: { "x-user-email": currentUserEmail || "default" }
+      })
+        .then(res => res.json())
+        .then(data => {
+           if (data.success && data.payments) {
+               setPayments(data.payments);
+           }
+        })
+        .catch(err => console.error(err));
     }
+  };
+
+  const [activeAdminTab, setActiveAdminTab] = useState<"dashboard" | "payments">("dashboard");
+  const [payments, setPayments] = useState<any[]>([]);
+  const [paymentSearch, setPaymentSearch] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
+
+  const handlePaymentAction = async (txId: string, action: "accept" | "reject", reason?: string) => {
+     try {
+       const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+       const res = await fetch(`${apiBaseURL}/api/admin/payments/action`, {
+          method: "POST",
+          headers: { 
+             "Content-Type": "application/json",
+             "x-user-email": currentUserEmail || "default"
+          },
+          body: JSON.stringify({ txId, action, reason })
+       });
+       if (res.ok) {
+           fetchAdminData();
+           setSelectedPayment(null);
+       } else {
+           alert("Gagal merubah status pembayaran");
+       }
+     } catch (err) {
+       console.error(err);
+     }
   };
 
   useEffect(() => {
@@ -69,7 +108,32 @@ export default function Dashboard() {
   const [showDropdown, setShowDropdown] = useState(false);
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState({ name: "", photo: "", registeredAt: 0 });
+  const [userProfile, setUserProfile] = useState({ 
+    name: "", 
+    photo: "", 
+    registeredAt: 0,
+    premiumStatus: false,
+    premiumPlan: "",
+    premiumStart: "",
+    premiumEnd: ""
+  });
+  const [userPayments, setUserPayments] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (currentUserEmail && !isAdmin) {
+      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
+      fetch(`${apiBaseURL}/api/user/payments`, {
+        headers: { "x-user-email": currentUserEmail }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.payments) setUserPayments(data.payments);
+      })
+      .catch(console.error);
+    }
+  }, [currentUserEmail, isAdmin]);
+
+  const [activeUserTab, setActiveUserTab] = useState<"dashboard" | "history">("dashboard");
   const [profileUpdateStatus, setProfileUpdateStatus] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
 
@@ -81,7 +145,15 @@ export default function Dashboard() {
       })
       .then(res => res.json())
       .then(data => {
-        if (!data.error) setUserProfile({ name: data.name || "", photo: data.photo || "", registeredAt: data.registeredAt || 0 });
+        if (!data.error) setUserProfile({ 
+          name: data.name || "", 
+          photo: data.photo || "", 
+          registeredAt: data.registeredAt || 0,
+          premiumStatus: data.premiumStatus || false,
+          premiumPlan: data.premiumPlan || "",
+          premiumStart: data.premiumStart || "",
+          premiumEnd: data.premiumEnd || ""
+        });
       })
       .catch(console.error);
     }
@@ -496,6 +568,83 @@ export default function Dashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Detail Modal */}
+      {selectedPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl max-w-lg w-full flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-300 relative">
+            <div className="p-6 border-b border-neutral-800 flex justify-between items-center bg-neutral-900 rounded-t-2xl z-10">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-400" /> Detail Pembayaran
+              </h2>
+              <button 
+                onClick={() => setSelectedPayment(null)}
+                className="text-neutral-500 hover:text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <p className="text-xs text-neutral-400">ID Transaksi</p>
+                   <p className="text-sm font-mono text-white mt-1">{selectedPayment.txId}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs text-neutral-400">Status</p>
+                   <p className="text-sm text-white mt-1">{selectedPayment.status}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs text-neutral-400">Username</p>
+                   <p className="text-sm text-white mt-1">{selectedPayment.username}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs text-neutral-400">No. WhatsApp</p>
+                   <p className="text-sm text-white mt-1">{selectedPayment.phone}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs text-neutral-400">Paket</p>
+                   <p className="text-sm text-white mt-1">{selectedPayment.planName} ({selectedPayment.planPrice})</p>
+                 </div>
+                 <div>
+                   <p className="text-xs text-neutral-400">Tanggal Upload</p>
+                   <p className="text-sm text-white mt-1">{new Date(selectedPayment.createdAt).toLocaleString()}</p>
+                 </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-neutral-400 mb-2">Screenshot Bukti Pembayaran</p>
+                <img src={selectedPayment.screenshot} alt="Screenshot" className="rounded-xl border border-neutral-800 w-full object-contain max-h-64 bg-black/50" />
+              </div>
+
+              {selectedPayment.status === "Menunggu Verifikasi" && (
+                <div className="pt-4 border-t border-neutral-800 space-y-3">
+                   <div className="flex gap-3">
+                     <button 
+                       onClick={() => handlePaymentAction(selectedPayment.txId, "accept")}
+                       className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-neutral-950 font-bold py-2.5 rounded-xl transition-colors"
+                     >
+                       Terima (Approve)
+                     </button>
+                     <button 
+                       onClick={() => {
+                          const reason = prompt("Masukkan alasan penolakan:");
+                          if (reason !== null) {
+                             handlePaymentAction(selectedPayment.txId, "reject", reason);
+                          }
+                       }}
+                       className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-2.5 rounded-xl transition-colors"
+                     >
+                       Tolak (Reject)
+                     </button>
+                   </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1277,7 +1426,62 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {!isAdmin && (
+          <div className="flex border-b border-neutral-800 bg-neutral-900 rounded-t-2xl px-6">
+            <button onClick={() => setActiveUserTab("dashboard")} className={`py-4 text-sm font-semibold transition-colors mr-6 ${activeUserTab === 'dashboard' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-neutral-500 hover:text-neutral-300'}`}>
+              Bot Dashboard
+            </button>
+            <button onClick={() => setActiveUserTab("history")} className={`py-4 text-sm font-semibold transition-colors ${activeUserTab === 'history' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-neutral-500 hover:text-neutral-300'}`}>
+              Riwayat Pembayaran
+            </button>
+          </div>
+        )}
+
+        {activeUserTab === "history" ? (
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
+             <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+               <FileText className="w-5 h-5 text-indigo-400" /> Riwayat Pembayaran Premium
+             </h2>
+             <div className="overflow-x-auto border border-neutral-800 rounded-xl">
+               <table className="w-full text-left text-sm whitespace-nowrap">
+                 <thead className="bg-neutral-950/50 border-b border-neutral-800 text-neutral-400">
+                   <tr>
+                     <th className="px-4 py-3 font-medium">ID Transaksi</th>
+                     <th className="px-4 py-3 font-medium">Paket</th>
+                     <th className="px-4 py-3 font-medium">Tanggal</th>
+                     <th className="px-4 py-3 font-medium">Status</th>
+                     <th className="px-4 py-3 font-medium">Tanggal Verifikasi</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-neutral-800">
+                   {userPayments.map((p, idx) => (
+                     <tr key={idx} className="hover:bg-neutral-800/30">
+                       <td className="px-4 py-3 font-mono text-xs text-neutral-300">{p.txId}</td>
+                       <td className="px-4 py-3 text-white">{p.planName}</td>
+                       <td className="px-4 py-3 text-neutral-400">{new Date(p.createdAt).toLocaleString()}</td>
+                       <td className="px-4 py-3">
+                         <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                           p.status === 'Diterima' ? 'bg-emerald-500/20 text-emerald-400' :
+                           p.status === 'Ditolak' ? 'bg-rose-500/20 text-rose-400' :
+                           'bg-yellow-500/20 text-yellow-400'
+                         }`}>
+                           {p.status}
+                         </span>
+                       </td>
+                       <td className="px-4 py-3 text-neutral-400">{p.verifiedAt ? new Date(p.verifiedAt).toLocaleString() : '-'}</td>
+                     </tr>
+                   ))}
+                   {userPayments.length === 0 && (
+                     <tr>
+                       <td colSpan={5} className="px-4 py-8 text-center text-neutral-500">Anda belum memiliki riwayat pembayaran.</td>
+                     </tr>
+                   )}
+                 </tbody>
+               </table>
+             </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Main Controls & Connection */}
           <div className="lg:col-span-2 space-y-6">
@@ -1339,6 +1543,27 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {userProfile && (
+              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg flex justify-between items-center">
+                <div>
+                  <h3 className="text-white font-semibold">Status Akun</h3>
+                  {userProfile.premiumStatus ? (
+                    <p className="text-sm text-neutral-400 mt-1">
+                      Paket Aktif: <span className="text-amber-400 font-bold">{userProfile.premiumPlan}</span>
+                      <br/>Berakhir pada: {new Date(userProfile.premiumEnd).toLocaleDateString()}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-neutral-400 mt-1">Anda menggunakan paket Standar (Gratis).</p>
+                  )}
+                </div>
+                {!userProfile.premiumStatus && (
+                  <button onClick={() => navigate("/#pricing")} className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold px-4 py-2 rounded-xl text-sm transition-colors shadow-lg">
+                    Upgrade Premium
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Actions Card */}
             <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg relative">
@@ -1524,66 +1749,162 @@ export default function Dashboard() {
 
             {/* Admin Web Control */}
             {isAdmin && (
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
-                <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-indigo-400" /> Admin Control Web (Preview)
-                </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center gap-4">
-                    <div className="bg-blue-500/20 p-3 rounded-xl text-blue-400"><Users className="w-6 h-6" /></div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-white">{totalUsers}</h3>
-                      <p className="text-xs text-neutral-400 mt-1">Total Pengguna Terdaftar</p>
-                    </div>
-                  </div>
-                  <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center gap-4">
-                    <div className="bg-emerald-500/20 p-3 rounded-xl text-emerald-400"><Smartphone className="w-6 h-6" /></div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-white">{totalBots}</h3>
-                      <p className="text-xs text-neutral-400 mt-1">Nomor Aktif Terhubung</p>
-                    </div>
-                  </div>
+              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-lg overflow-hidden">
+                <div className="flex border-b border-neutral-800 bg-neutral-950/50">
+                  <button onClick={() => setActiveAdminTab("dashboard")} className={`flex-1 py-4 text-sm font-semibold transition-colors ${activeAdminTab === 'dashboard' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-neutral-500 hover:text-neutral-300'}`}>
+                    Dashboard
+                  </button>
+                  <button onClick={() => setActiveAdminTab("payments")} className={`flex-1 flex justify-center items-center gap-2 py-4 text-sm font-semibold transition-colors ${activeAdminTab === 'payments' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-neutral-500 hover:text-neutral-300'}`}>
+                    Premium Payments
+                    {payments.filter(p => p.status === 'Menunggu Verifikasi').length > 0 && (
+                      <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{payments.filter(p => p.status === 'Menunggu Verifikasi').length}</span>
+                    )}
+                  </button>
                 </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-neutral-400">Manajemen Nomor Aktif</h3>
-                    <button onClick={fetchAdminData} className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1">
-                      <RefreshCw className="w-3 h-3" /> Refresh
-                    </button>
-                  </div>
-                  
-                  {activeBotsInfo.length > 0 ? (
-                    <div className="space-y-2">
-                       {activeBotsInfo.map((bot, idx) => (
-                          <div key={idx} className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                               <span className="relative flex h-3 w-3">
-                                {bot.status === "connected" && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-                                <span className={`relative inline-flex rounded-full h-3 w-3 ${bot.status === "connected" ? "bg-emerald-500" : "bg-rose-500"}`}></span>
-                              </span>
-                              <div>
-                                <p className="text-sm font-medium text-white">{bot.email}</p>
-                                <p className="text-xs text-neutral-500 flex items-center gap-2">
-                                  <span>{bot.status === "connected" ? "Aktif" : bot.status === "connecting" ? "Menghubungkan" : "Terputus"}</span>
-                                  {bot.phoneNumber && <span className="px-1.5 py-0.5 bg-neutral-800 rounded font-mono text-[10px] text-white">+{bot.phoneNumber}</span>}
-                                </p>
-                              </div>
-                            </div>
-                            <button 
-                              onClick={() => handleAdminDeleteSession(bot.email)}
-                              disabled={adminDeleting === bot.email}
-                              className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg transition-colors border border-rose-500/30 disabled:opacity-50"
-                            >
-                              {adminDeleting === bot.email ? "Memutus..." : "Putuskan Sesi"}
-                            </button>
+                
+                <div className="p-6">
+                  {activeAdminTab === "dashboard" ? (
+                    <>
+                      <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                        <ShieldCheck className="w-5 h-5 text-indigo-400" /> Admin Control Web (Preview)
+                      </h2>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center gap-4">
+                          <div className="bg-blue-500/20 p-3 rounded-xl text-blue-400"><Users className="w-6 h-6" /></div>
+                          <div>
+                            <h3 className="text-2xl font-bold text-white">{totalUsers}</h3>
+                            <p className="text-xs text-neutral-400 mt-1">Total Pengguna Terdaftar</p>
                           </div>
-                       ))}
-                    </div>
+                        </div>
+                        <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center gap-4">
+                          <div className="bg-emerald-500/20 p-3 rounded-xl text-emerald-400"><Smartphone className="w-6 h-6" /></div>
+                          <div>
+                            <h3 className="text-2xl font-bold text-white">{totalBots}</h3>
+                            <p className="text-xs text-neutral-400 mt-1">Nomor Aktif Terhubung</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-medium text-neutral-400">Manajemen Nomor Aktif</h3>
+                          <button onClick={fetchAdminData} className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1">
+                            <RefreshCw className="w-3 h-3" /> Refresh
+                          </button>
+                        </div>
+                        
+                        {activeBotsInfo.length > 0 ? (
+                          <div className="space-y-2">
+                             {activeBotsInfo.map((bot, idx) => (
+                                <div key={idx} className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                     <span className="relative flex h-3 w-3">
+                                      {bot.status === "connected" && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                                      <span className={`relative inline-flex rounded-full h-3 w-3 ${bot.status === "connected" ? "bg-emerald-500" : "bg-rose-500"}`}></span>
+                                    </span>
+                                    <div>
+                                      <p className="text-sm font-medium text-white">{bot.email}</p>
+                                      <p className="text-xs text-neutral-500 flex items-center gap-2">
+                                        <span>{bot.status === "connected" ? "Aktif" : bot.status === "connecting" ? "Menghubungkan" : "Terputus"}</span>
+                                        {bot.phoneNumber && <span className="px-1.5 py-0.5 bg-neutral-800 rounded font-mono text-[10px] text-white">+{bot.phoneNumber}</span>}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button 
+                                    onClick={() => handleAdminDeleteSession(bot.email)}
+                                    disabled={adminDeleting === bot.email}
+                                    className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg transition-colors border border-rose-500/30 disabled:opacity-50"
+                                  >
+                                    {adminDeleting === bot.email ? "Memutus..." : "Putuskan Sesi"}
+                                  </button>
+                                </div>
+                             ))}
+                          </div>
+                        ) : (
+                          <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl text-center text-sm text-neutral-500">
+                            Tidak ada nomor bot yang sedang terhubung di sistem.
+                          </div>
+                        )}
+                      </div>
+                    </>
                   ) : (
-                    <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl text-center text-sm text-neutral-500">
-                      Tidak ada nomor bot yang sedang terhubung di sistem.
+                    <div className="space-y-6">
+                      <div className="flex flex-col md:flex-row gap-4 justify-between">
+                         <div className="flex gap-2 w-full md:w-auto">
+                            <input 
+                               placeholder="Cari Username/WA..." 
+                               value={paymentSearch} 
+                               onChange={e => setPaymentSearch(e.target.value)} 
+                               className="bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-amber-500 w-full md:w-64"
+                            />
+                            <select 
+                               value={paymentFilter} 
+                               onChange={e => setPaymentFilter(e.target.value)}
+                               className="bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                            >
+                               <option value="all">Semua Status</option>
+                               <option value="Menunggu Verifikasi">Menunggu Verifikasi</option>
+                               <option value="Diterima">Diterima</option>
+                               <option value="Ditolak">Ditolak</option>
+                            </select>
+                         </div>
+                         <button onClick={fetchAdminData} className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1 bg-emerald-500/10 px-3 rounded-lg border border-emerald-500/20">
+                            <RefreshCw className="w-4 h-4" /> Refresh
+                         </button>
+                      </div>
+
+                      <div className="overflow-x-auto border border-neutral-800 rounded-xl">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                          <thead className="bg-neutral-950/50 border-b border-neutral-800 text-neutral-400">
+                            <tr>
+                              <th className="px-4 py-3 font-medium">ID Transaksi</th>
+                              <th className="px-4 py-3 font-medium">Username</th>
+                              <th className="px-4 py-3 font-medium">No. WhatsApp</th>
+                              <th className="px-4 py-3 font-medium">Paket</th>
+                              <th className="px-4 py-3 font-medium">Tanggal</th>
+                              <th className="px-4 py-3 font-medium">Status</th>
+                              <th className="px-4 py-3 font-medium">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-neutral-800">
+                            {payments.filter(p => 
+                              (paymentFilter === "all" || p.status === paymentFilter) &&
+                              (p.username.toLowerCase().includes(paymentSearch.toLowerCase()) || p.phone.includes(paymentSearch))
+                            ).map((p, idx) => (
+                              <tr key={idx} className="hover:bg-neutral-800/30">
+                                <td className="px-4 py-3 font-mono text-xs text-neutral-300">{p.txId}</td>
+                                <td className="px-4 py-3 text-white">{p.username}</td>
+                                <td className="px-4 py-3 text-neutral-300">{p.phone}</td>
+                                <td className="px-4 py-3 text-amber-400">{p.planName}</td>
+                                <td className="px-4 py-3 text-neutral-400">{new Date(p.createdAt).toLocaleString()}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                    p.status === 'Diterima' ? 'bg-emerald-500/20 text-emerald-400' :
+                                    p.status === 'Ditolak' ? 'bg-rose-500/20 text-rose-400' :
+                                    'bg-yellow-500/20 text-yellow-400'
+                                  }`}>
+                                    {p.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                   <button 
+                                     onClick={() => setSelectedPayment(p)}
+                                     className="text-xs bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded border border-indigo-500/30"
+                                   >
+                                     Detail
+                                   </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {payments.length === 0 && (
+                              <tr>
+                                <td colSpan={7} className="px-4 py-8 text-center text-neutral-500">Tidak ada data pembayaran.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1618,6 +1939,7 @@ export default function Dashboard() {
           </div>
 
         </div>
+        )}
       </div>
     </div>
   );
