@@ -49,6 +49,7 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "react-onesignal": "^3.5.5",
     "react-router-dom": "^7.15.0",
     "ruhend-scraper": "^10.0.3",
     "sharp": "^0.34.5",

@@ -3,8 +3,8 @@ import { io, Socket } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
 import { Activity, Power, RefreshCw, Trash2, Smartphone, ShieldCheck, FileText, Users, Gamepad2, Settings, Clock, LogOut, MoreVertical, X, MessageCircle, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { messaging } from "../lib/firebase";
-import { getToken, onMessage } from "firebase/messaging";
+import { setupOneSignal, requestOneSignalPermission } from "../lib/onesignal";
+import OneSignal from 'react-onesignal';
 
 type BotStatus = "disconnected" | "connecting" | "connected";
 
@@ -79,37 +79,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (isAdmin) {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/firebase-messaging-sw.js')
-          .then((registration) => {
-            console.log('SW registered', registration);
-            const vapidKey = import.meta.env.VITE_FCM_VAPID_KEY;
-            
-            if (Notification.permission === 'granted') {
-                getToken(messaging, { vapidKey, serviceWorkerRegistration: registration })
-                  .then((currentToken) => {
-                    if (currentToken) {
-                      const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
-                      fetch(`${apiBaseURL}/api/admin/fcm-token`, {
-                        method: 'POST',
-                        headers: { 
-                          'Content-Type': 'application/json',
-                          'x-user-email': currentUserEmail || ''
-                        },
-                        body: JSON.stringify({ token: currentToken })
-                      }).catch(console.error);
-                    }
-                  })
-                  .catch((err) => console.log('An error occurred while retrieving token.', err));
-            }
-          }).catch((err) => console.log('SW registration failed', err));
-      }
-      
-      onMessage(messaging, (payload) => {
-        console.log('Message received. ', payload);
-        alert(`🔔 ${payload.notification?.title}\n${payload.notification?.body}`);
-        fetchAdminData();
-      });
+      setupOneSignal();
     }
   }, [isAdmin, currentUserEmail]);
   const [paymentSearch, setPaymentSearch] = useState("");
@@ -1783,7 +1753,7 @@ export default function Dashboard() {
             {/* Admin Web Control */}
             {isAdmin && (
               <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-lg overflow-hidden">
-                {("Notification" in window) && Notification.permission !== 'granted' && (
+                {isAdmin && ('Notification' in window) && Notification.permission !== 'granted' && (
                   <div className="bg-amber-500/10 border border-amber-500/20 p-4 mx-6 mt-6 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
                       <h3 className="text-amber-400 font-bold mb-1 flex items-center gap-2">⚠️ Notifikasi Push Belum Aktif</h3>
@@ -1791,42 +1761,17 @@ export default function Dashboard() {
                     </div>
                     <button 
                       onClick={async () => {
-                        try {
-                          const permission = await Notification.requestPermission();
-                          if (permission === 'granted') {
-                            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-                            const vapidKey = import.meta.env.VITE_FCM_VAPID_KEY;
-                            if (!vapidKey) {
-                              alert("VITE_FCM_VAPID_KEY belum di-set di environment variables.");
-                              return;
-                            }
-                            const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
-                            if (currentToken) {
-                              const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
-                              await fetch(`${apiBaseURL}/api/admin/fcm-token`, {
-                                method: 'POST',
-                                headers: { 
-                                  'Content-Type': 'application/json',
-                                  'x-user-email': currentUserEmail || ''
-                                },
-                                body: JSON.stringify({ token: currentToken })
-                              });
-                              alert("Notifikasi berhasil diaktifkan!");
-                              window.location.reload();
-                            } else {
-                              alert("Gagal mendapatkan token perangkat.");
-                            }
-                          } else {
-                            alert("Izin diblokir. Silakan izinkan notifikasi dari pengaturan browser (icon gembok di sebelah URL).");
-                          }
-                        } catch (err: any) {
-                          console.error(err);
-                          alert("Terjadi kesalahan: " + err.message);
+                        const granted = await requestOneSignalPermission();
+                        if (granted) {
+                           alert("Notifikasi berhasil diaktifkan!");
+                           window.location.reload();
+                        } else {
+                           alert("Izin diblokir. Silakan izinkan notifikasi dari pengaturan browser.");
                         }
                       }}
                       className="whitespace-nowrap bg-amber-500 hover:bg-amber-600 text-neutral-950 px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
                     >
-                      Aktifkan Notifikasi Mobile
+                      Aktifkan Notifikasi OneSignal
                     </button>
                   </div>
                 )}

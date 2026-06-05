@@ -32,6 +32,37 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && proc
   console.warn("Firebase Admin SDK not initialized: Missing service account environment variables");
 }
 
+// Helper to send Admin Notifications via OneSignal
+async function sendAdminNotification(title: string, message: string, url: string = "/") {
+  try {
+    const appId = process.env.ONESIGNAL_APP_ID || process.env.VITE_ONESIGNAL_APP_ID;
+    const apiKey = process.env.ONESIGNAL_REST_API_KEY;
+    if (appId && apiKey) {
+        const fetch = (await import('node-fetch')).default || global.fetch;
+        await fetch('https://onesignal.com/api/v1/notifications', {
+           method: 'POST',
+           headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Basic ${apiKey}`
+           },
+           body: JSON.stringify({
+              app_id: appId,
+              included_segments: ["All"], // Broadcasting to all user bases
+              headings: { "en": title },
+              contents: { "en": message },
+              url: url
+           })
+        }).then(res => res.json()).then(data => {
+           console.log('OneSignal push response:', data);
+        }).catch(err => {
+           console.error("OneSignal request error:", err);
+        });
+    }
+  } catch (osErr) {
+    console.error("Failed to send OneSignal notification:", osErr);
+  }
+}
+
 process.on('uncaughtException', (err) => {
   console.error("Uncaught Exception:", err);
 });
@@ -118,6 +149,9 @@ async function startServer() {
     try {
         await setDoc(doc(adminDb, "users", email), newUser);
     } catch (e) {}
+
+    // Send admin notification
+    sendAdminNotification("Pengguna Baru", `Pendaftaran pengguna baru: ${email}`);
 
     // keep local array sync for existing logic
     let localUsers: any[] = [];
@@ -410,37 +444,12 @@ async function startServer() {
       // Save to Firestore
       await setDoc(doc(adminDb, "payments", txId), paymentData);
 
-      // Trigger Push Notification Admin
-      // Fire and forget FCM message to all admin device tokens
-      // Admin tokens could be stored in a 'settings/fcm_tokens' doc or 'admin_tokens' collection.
-      try {
-        const tokensSnap = await getDoc(doc(adminDb, "settings", "fcm_tokens"));
-        if (tokensSnap.exists()) {
-           const tokens = tokensSnap.data().tokens || [];
-           if (tokens.length > 0 && admin.apps.length > 0) {
-               const message = {
-                  notification: {
-                     title: "🔔 Pembayaran Baru",
-                     body: "Pengguna baru mengirim bukti pembayaran premium dan menunggu verifikasi."
-                  },
-                  data: { txId },
-                  webpush: {
-                     fcmOptions: {
-                        link: "/"
-                     }
-                  },
-                  tokens: tokens
-               };
-               admin.messaging().sendEachForMulticast(message)
-                  .then((response) => {
-                     console.log(response.successCount + ' messages were sent successfully via Admin SDK');
-                  })
-                  .catch((err) => console.error("Admin SDK send failure:", err));
-           }
-        }
-      } catch (fcmErr) {
-        console.error("Failed to send FCM notification:", fcmErr);
-      }
+      // Trigger Push Notification Admin via OneSignal
+      sendAdminNotification(
+          "🔔 Pembayaran Baru",
+          "Pengguna baru mengirim bukti pembayaran premium dan menunggu verifikasi.",
+          "/"
+      );
 
       res.json({ success: true, txId });
     } catch (err: any) {
@@ -527,29 +536,7 @@ async function startServer() {
     }
   });
   
-  // Admin FCM Token endpoint
-  app.post("/api/admin/fcm-token", async (req, res) => {
-    let currentUser = req.headers["x-user-email"] as string;
-    if (currentUser !== "nugiaxantika@gmail.com") return res.status(403).json({ error: "Forbidden" });
-    try {
-      const { token } = req.body;
-      if (!token) return res.status(400).json({ error: "Token is required" });
-      
-      const docRef = doc(adminDb, "settings", "fcm_tokens");
-      const snap = await getDoc(docRef);
-      let tokens: string[] = [];
-      if (snap.exists()) {
-        tokens = snap.data().tokens || [];
-      }
-      if (!tokens.includes(token)) {
-        tokens.push(token);
-        await setDoc(docRef, { tokens }, { merge: true });
-      }
-      res.json({ success: true });
-    } catch(err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+
 
   app.get("/api/user/payments", async (req, res) => {
     let currentUser = req.headers["x-user-email"] as string;
