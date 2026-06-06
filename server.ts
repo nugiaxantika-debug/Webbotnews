@@ -32,37 +32,6 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && proc
   console.warn("Firebase Admin SDK not initialized: Missing service account environment variables");
 }
 
-// Helper to send Admin Notifications via OneSignal
-async function sendAdminNotification(title: string, message: string, url: string = "/") {
-  try {
-    const appId = process.env.ONESIGNAL_APP_ID || process.env.VITE_ONESIGNAL_APP_ID;
-    const apiKey = process.env.ONESIGNAL_REST_API_KEY;
-    if (appId && apiKey) {
-        const fetch = (await import('node-fetch')).default || global.fetch;
-        await fetch('https://onesignal.com/api/v1/notifications', {
-           method: 'POST',
-           headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Basic ${apiKey}`
-           },
-           body: JSON.stringify({
-              app_id: appId,
-              included_segments: ["All"], // Broadcasting to all user bases
-              headings: { "en": title },
-              contents: { "en": message },
-              url: url
-           })
-        }).then(res => res.json()).then(data => {
-           console.log('OneSignal push response:', data);
-        }).catch(err => {
-           console.error("OneSignal request error:", err);
-        });
-    }
-  } catch (osErr) {
-    console.error("Failed to send OneSignal notification:", osErr);
-  }
-}
-
 process.on('uncaughtException', (err) => {
   console.error("Uncaught Exception:", err);
 });
@@ -149,9 +118,6 @@ async function startServer() {
     try {
         await setDoc(doc(adminDb, "users", email), newUser);
     } catch (e) {}
-
-    // Send admin notification
-    sendAdminNotification("Pengguna Baru", `Pendaftaran pengguna baru: ${email}`);
 
     // keep local array sync for existing logic
     let localUsers: any[] = [];
@@ -443,13 +409,6 @@ async function startServer() {
 
       // Save to Firestore
       await setDoc(doc(adminDb, "payments", txId), paymentData);
-
-      // Trigger Push Notification Admin via OneSignal
-      sendAdminNotification(
-          "🔔 Pembayaran Baru",
-          "Pengguna baru mengirim bukti pembayaran premium dan menunggu verifikasi.",
-          "/"
-      );
 
       res.json({ success: true, txId });
     } catch (err: any) {

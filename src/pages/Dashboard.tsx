@@ -3,8 +3,6 @@ import { io, Socket } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
 import { Activity, Power, RefreshCw, Trash2, Smartphone, ShieldCheck, FileText, Users, Gamepad2, Settings, Clock, LogOut, MoreVertical, X, MessageCircle, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { setupOneSignal, requestOneSignalPermission } from "../lib/onesignal";
-import OneSignal from 'react-onesignal';
 
 type BotStatus = "disconnected" | "connecting" | "connected";
 
@@ -78,9 +76,7 @@ export default function Dashboard() {
   const [payments, setPayments] = useState<any[]>([]);
 
   useEffect(() => {
-    if (isAdmin) {
-      setupOneSignal();
-    }
+    // Only run admin-related effects here if necessary, or just leave it empty.
   }, [isAdmin, currentUserEmail]);
   const [paymentSearch, setPaymentSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
@@ -1753,28 +1749,6 @@ export default function Dashboard() {
             {/* Admin Web Control */}
             {isAdmin && (
               <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-lg overflow-hidden">
-                {isAdmin && ('Notification' in window) && Notification.permission !== 'granted' && (
-                  <div className="bg-amber-500/10 border border-amber-500/20 p-4 mx-6 mt-6 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-amber-400 font-bold mb-1 flex items-center gap-2">⚠️ Notifikasi Push Belum Aktif</h3>
-                      <p className="text-sm text-neutral-400">Aktifkan notifikasi agar ponsel Anda berdering saat ada pembayaran masuk.</p>
-                    </div>
-                    <button 
-                      onClick={async () => {
-                        const granted = await requestOneSignalPermission();
-                        if (granted) {
-                           alert("Notifikasi berhasil diaktifkan!");
-                           window.location.reload();
-                        } else {
-                           alert("Izin diblokir. Silakan izinkan notifikasi dari pengaturan browser.");
-                        }
-                      }}
-                      className="whitespace-nowrap bg-amber-500 hover:bg-amber-600 text-neutral-950 px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
-                    >
-                      Aktifkan Notifikasi OneSignal
-                    </button>
-                  </div>
-                )}
                 <div className="flex border-b border-neutral-800 bg-neutral-950/50">
                   <button onClick={() => setActiveAdminTab("dashboard")} className={`flex-1 py-4 text-sm font-semibold transition-colors ${activeAdminTab === 'dashboard' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-neutral-500 hover:text-neutral-300'}`}>
                     Dashboard
