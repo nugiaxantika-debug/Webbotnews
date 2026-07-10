@@ -20,11 +20,11 @@ export default function App() {
         const res = await fetch(`${apiBaseURL}/api/config`);
         const data = await res.json();
         
-        if (data) {
+        if (data && data.config) {
           setMaintenance({
-            isMaintenance: data.maintenanceMode || false,
-            message: data.maintenanceMessage || "Sistem sedang dalam perbaikan. Kami akan segera kembali.",
-            image: data.maintenanceImage || ""
+            isMaintenance: data.config.maintenanceMode || false,
+            message: data.config.maintenanceMessage || "Sistem sedang dalam perbaikan. Kami akan segera kembali.",
+            image: data.config.maintenanceImage || ""
           });
         }
       } catch (err) {

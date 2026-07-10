@@ -581,7 +581,7 @@ export class WhatsAppBot {
       const isVideoInfo = messageObj?.videoMessage;
       const isImageInfo = messageObj?.imageMessage;
       const isStickerInfo = messageObj?.stickerMessage;
-      const isViewOnceInfo = messageObj?.viewOnceMessage || messageObj?.viewOnceMessageV2 || messageObj?.viewOnceMessageV2Extension;
+      const isViewOnceInfo = messageObj?.viewOnceMessage || messageObj?.viewOnceMessageV2 || messageObj?.viewOnceMessageV2Extension || messageObj?.imageMessage?.viewOnce || messageObj?.videoMessage?.viewOnce;
       const textInfo = getMessageText(messageObj);
       const isForwardedStatus = messageObj?.extendedTextMessage?.contextInfo?.isForwarded && messageObj?.extendedTextMessage?.contextInfo?.forwardingScore > 0 && messageObj?.extendedTextMessage?.contextInfo?.participant === "status@broadcast";
       
@@ -730,7 +730,7 @@ export class WhatsAppBot {
     const funCommands = ['.funmenu', 'funmenu', '.cekkhodam', 'cekkhodam', '.cekganteng', 'cekganteng', '.cekcantik', 'cekcantik', '.cekjodoh', 'cekjodoh', '.ceklesby', 'ceklesby', '.cekpasangan', 'cekpasangan', '.cekgay', 'cekgay', '.cekhoby', 'cekhoby', '.cekkesetiaan', 'cekkesetiaan', '.jadian', 'jadian', '.kiss', 'kiss', '.quotes', 'quotes', '.avatar', 'avatar', '.ppcouple', 'ppcouple'];
     const margaCommands = ['.margamenu', 'margamenu', '.cekpariban', 'cekpariban', '.cektartulang', 'cektartulang', '.cektarito', 'cektarito', '.cekpadan', 'cekpadan'];
     const videoCommands = ['.videomenu', 'videomenu', '.tiktokgirl', 'tiktokgirl', '.tiktoktobrut', 'tiktoktobrut', '.tiktokkayes', 'tiktokkayes', '.tiktokhot', 'tiktokhot', '.tiktokghea', 'tiktokghea', '.tiktokbocil', 'tiktokbocil', '.tiktoklesbi', 'tiktoklesbi', '.tiktokgay', 'tiktokgay'];
-    const stickerCommands = ['.stickermenu', 'stickermenu', '.stiker', 'stiker', '.hd', 'hd', '.brat', 'brat', '.bratvid', 'bratvid', '.smeme', 'smeme', '.qc', 'qc'];
+    const stickerCommands = ['.stickermenu', 'stickermenu', '.stiker', 'stiker', '.hd', 'hd', '.brat', 'brat', '.bratvid', 'bratvid', '.smeme', 'smeme', '.qc', 'qc', '.toimg', 'toimg', '.togif', 'togif'];
     const downloadCommands = ['.downloadmenu', 'downloadmenu', '.tiktok', 'tiktok', '.playyt', 'playyt', '.fotosexy', 'fotosexy', '.pinterest', 'pinterest'];
     
     if (ownerCommands.includes(requestedCmd) && !isOwner) {
@@ -835,7 +835,7 @@ Ketik menu yang kamu inginkan.`;
       await this.sock.sendMessage(jid, { text: downloadText }, { quoted: msg });
       this.broadcastState(`Responded to downloadmenu command`);
     } else if (body === "stickermenu" || body === ".stickermenu" || body === "sticker menu" || body === ".sticker menu") {
-      const stickerText = `🎨 *Sticker Menu*\n\n│ .stiker - ubah gambar jadi stiker\n│ .hd - tingkatkan resolusi gambar\n│ .brat - buat stiker teks brat\n│ .bratvid - buat stiker teks video brat\n│ .smeme - buat stiker dengan teks|teks\n│ .qc - buat stiker text chat`;
+      const stickerText = `🎨 *Sticker Menu*\n\n│ .stiker - ubah gambar jadi stiker\n│ .hd - tingkatkan resolusi gambar\n│ .brat - buat stiker teks brat\n│ .bratvid - buat stiker teks video brat\n│ .smeme - buat stiker dengan teks|teks\n│ .qc - buat stiker text chat\n│ .toimg - stiker ke gambar\n│ .togif - gambar ke gif`;
       await this.sock.sendMessage(jid, { text: stickerText }, { quoted: msg });
       this.broadcastState(`Responded to stickermenu command`);
     } else if (body === "funmenu" || body === ".funmenu" || body === "fun menu" || body === ".fun menu") {
@@ -851,7 +851,7 @@ Ketik menu yang kamu inginkan.`;
       await this.sock.sendMessage(jid, { text: videoText }, { quoted: msg });
       this.broadcastState(`Responded to videomenu command`);
     } else if (body === "gamemenu" || body === ".gamemenu" || body === "game menu" || body === ".game menu") {
-      await this.sock.sendMessage(jid, { text: "🎮 *Game Menu*\n\n│ .tebakgambar\n│ .susunkata\n│ .math\n│ .tebakkata\n│ .tebakbendera\n│ .asahotak\n│ .tebaklirik\n│ .tekateki\n│ .tebakangka\n│ .kuis\n│ .tebakkota\n│ .family100\n│ .tebakusia\n│ .tebakkimia\n│ .werewolf" }, { quoted: msg });
+      await this.sock.sendMessage(jid, { text: "🎮 *Game Menu*\n\n│ .tebakgambar\n│ .susunkata\n│ .math\n│ .tebakkata\n│ .tebakbendera\n│ .asahotak\n│ .tebaklirik\n│ .tekateki\n│ .tebakangka\n│ .kuis\n│ .tebakkota\n│ .family100\n│ .tebakusia\n│ .tebakkimia\n│ .tebakbuah\n│ .werewolf" }, { quoted: msg });
       this.broadcastState(`Responded to gamemenu command`);
     } else if (body === "ownermenu" || body === ".ownermenu" || body === "owner menu" || body === ".owner menu") {
       const ownerText = `👑 *Owner Menu*
@@ -1083,6 +1083,33 @@ Ketik menu yang kamu inginkan.`;
           await this.sock.sendMessage(jid, { text: "Gagal memuat game asahotak." }, { quoted: msg });
       }
       this.broadcastState(`Responded to asahotak command`);
+    } else if (body === ".tebakbuah" || body === "tebakbuah") {
+      const buahList = [
+          { soal: "🍎", jawaban: "apel" },
+          { soal: "🍌", jawaban: "pisang" },
+          { soal: "🍇", jawaban: "anggur" },
+          { soal: "🍉", jawaban: "semangka" },
+          { soal: "🍊", jawaban: "jeruk" },
+          { soal: "🍓", jawaban: "stroberi" },
+          { soal: "🥭", jawaban: "mangga" },
+          { soal: "🍍", jawaban: "nanas" },
+          { soal: "🥥", jawaban: "kelapa" },
+          { soal: "🥝", jawaban: "kiwi" },
+          { soal: "🥑", jawaban: "alpukat" },
+          { soal: "🍒", jawaban: "ceri" },
+          { soal: "🍈", jawaban: "melon" },
+          { soal: "🍐", jawaban: "pir" },
+          { soal: "🍋", jawaban: "lemon" },
+          { soal: "🍑", jawaban: "persik" },
+          { soal: "🍅", jawaban: "tomat" },
+          { soal: "🍆", jawaban: "terong" }
+      ];
+      const r = buahList[Math.floor(Math.random() * buahList.length)];
+      const sentMsg = await this.sock.sendMessage(jid, { text: `🍎 *Game Tebak Buah*\n\nBuah apakah ini: ${r.soal}\n\n_Silakan balas (reply) pesan ini dengan jawabanmu!_` }, { quoted: msg });
+      if (sentMsg?.key?.id) {
+          this.activeGames.set(sentMsg.key.id, { answer: r.jawaban, type: "tebakbuah" });
+      }
+      this.broadcastState(`Responded to tebakbuah command`);
     } else if (body === ".tebaklirik" || body === "tebaklirik") {
       try {
           const res = await axios.get('https://raw.githubusercontent.com/BochilTeam/database/master/games/tebaklirik.json');
@@ -1731,7 +1758,7 @@ ${e.stack || e.message || String(e)}` }, { quoted: msg });
                  }]
              };
              
-             const res = await axios.post("https://bot.lyo.su/quote/generate", payload);
+             const res = await axios.post("https://qc.botcahx.eu.org/generate", payload);
              if (res.data && res.data.result && res.data.result.image) {
                 const buffer = Buffer.from(res.data.result.image, 'base64');
                 const finalBuffer = await sharp(buffer).webp().toBuffer();
@@ -1743,6 +1770,50 @@ ${e.stack || e.message || String(e)}` }, { quoted: msg });
              console.error("QC error: ", e);
              await this.sock.sendMessage(jid, { text: `❌ Gagal membuat QC.` }, { quoted: msg });
           }
+       }
+    } else if (body.startsWith(".toimg") || body.startsWith("toimg")) {
+       const isQuotedSticker = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage;
+       if (isQuotedSticker) {
+           try {
+               await this.sock.sendMessage(jid, { text: "⏳ *Sedang memproses...*" }, { quoted: msg });
+               const buffer = await downloadMediaMessage(
+                   { message: { stickerMessage: isQuotedSticker } } as any, 
+                   'buffer', 
+                   {}, 
+                   { logger: pino({ level: 'silent' }) as any, reuploadRequest: this.sock.updateMediaMessage }
+               ) as Buffer;
+               const imgBuffer = await sharp(buffer).jpeg().toBuffer();
+               await this.sock.sendMessage(jid, { image: imgBuffer }, { quoted: msg });
+           } catch (e: any) {
+               console.error("toimg error:", e);
+               await this.sock.sendMessage(jid, { text: `❌ Gagal merubah stiker ke gambar! Error: ${e.message}` }, { quoted: msg });
+           }
+       } else {
+           await this.sock.sendMessage(jid, { text: "Reply stiker dengan perintah ini!" }, { quoted: msg });
+       }
+    } else if (body.startsWith(".togif") || body.startsWith("togif")) {
+       const isQuotedImage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+       const isQuotedSticker = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage;
+       const isImage = msg.message?.imageMessage;
+       const messageToDownload = isQuotedImage ? { message: { imageMessage: isQuotedImage } } : isQuotedSticker ? { message: { stickerMessage: isQuotedSticker } } : isImage ? msg : null;
+       
+       if (messageToDownload) {
+           try {
+               await this.sock.sendMessage(jid, { text: "⏳ *Sedang memproses...*" }, { quoted: msg });
+               const buffer = await downloadMediaMessage(
+                   messageToDownload as any, 
+                   'buffer', 
+                   {}, 
+                   { logger: pino({ level: 'silent' }) as any, reuploadRequest: this.sock.updateMediaMessage }
+               ) as Buffer;
+               const gifBuffer = await sharp(buffer, { animated: true }).gif().toBuffer();
+               await this.sock.sendMessage(jid, { document: gifBuffer, mimetype: 'image/gif', fileName: 'converted.gif' }, { quoted: msg });
+           } catch (e: any) {
+               console.error("togif error:", e);
+               await this.sock.sendMessage(jid, { text: `❌ Gagal merubah ke gif! Error: ${e.message}` }, { quoted: msg });
+           }
+       } else {
+           await this.sock.sendMessage(jid, { text: "Kirim atau reply gambar/stiker dengan perintah ini!" }, { quoted: msg });
        }
     } else if (body.startsWith(".sewabot") || body.startsWith("sewabot")) {
        const text = messageContent.replace(/^\.?sewabot\s*/i, "").trim();
