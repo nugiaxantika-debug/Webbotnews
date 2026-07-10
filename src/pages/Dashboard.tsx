@@ -78,6 +78,7 @@ export default function Dashboard() {
   useEffect(() => {
     // Only run admin-related effects here if necessary, or just leave it empty.
   }, [isAdmin, currentUserEmail]);
+  
   const [paymentSearch, setPaymentSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
@@ -669,6 +670,50 @@ export default function Dashboard() {
             </div>
             
             <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar">
+              {/* Maintenance Mode */}
+              <div className="space-y-4 bg-rose-500/5 p-4 rounded-xl border border-rose-500/20">
+                <div className="flex items-center justify-between border-b border-rose-500/20 pb-4 mb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-rose-400 uppercase tracking-wider">Mode Maintenance</h3>
+                    <p className="text-xs text-neutral-400 mt-1">Aktifkan untuk menampilkan halaman maintenance ke seluruh pengguna non-admin.</p>
+                  </div>
+                  <button
+                    onClick={() => setWebConfig({...webConfig, maintenanceMode: !webConfig.maintenanceMode})}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${webConfig.maintenanceMode ? 'bg-rose-500' : 'bg-neutral-700'}`}
+                  >
+                    <span className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white transition-all ${webConfig.maintenanceMode ? 'left-[calc(100%-18px)]' : 'left-[2px]'}`}></span>
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">Pesan Maintenance</label>
+                    <textarea
+                      value={webConfig.maintenanceMessage || ""}
+                      onChange={(e) => setWebConfig({...webConfig, maintenanceMessage: e.target.value})}
+                      rows={3}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-rose-500 resize-none"
+                      placeholder="Contoh: Sistem sedang dalam perbaikan..."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-400 mb-1.5 block">URL Gambar Kustom (Opsional)</label>
+                    <input
+                      type="text"
+                      value={webConfig.maintenanceImage || ""}
+                      onChange={(e) => setWebConfig({...webConfig, maintenanceImage: e.target.value})}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-rose-500"
+                      placeholder="https://example.com/image.png"
+                    />
+                    {webConfig.maintenanceImage && (
+                      <div className="mt-2 border border-neutral-800 rounded-lg overflow-hidden max-w-[150px]">
+                        <img src={webConfig.maintenanceImage} alt="Preview" className="w-full h-auto object-cover" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Media & Brand */}
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider">Identitas Brand</h3>
@@ -1827,7 +1872,7 @@ export default function Dashboard() {
                         )}
                       </div>
                     </>
-                  ) : (
+                  ) : activeAdminTab === "payments" ? (
                     <div className="space-y-6">
                       <div className="flex flex-col md:flex-row gap-4 justify-between">
                          <div className="flex gap-2 w-full md:w-auto">
@@ -1905,7 +1950,7 @@ export default function Dashboard() {
                         </table>
                       </div>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             )}
