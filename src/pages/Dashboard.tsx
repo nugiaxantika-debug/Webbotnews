@@ -228,7 +228,7 @@ export default function Dashboard() {
     plan2ButtonText: "Berlangganan VIP",
     plan2AutoDisconnect: false,
     plan2Days: 30,
-    dashTitle: "WhatsApp Bot Dashboard",
+    dashTitle: "Jadibot LasakVip Dashboard",
     dashSubtitle: "Kelola bot WhatsApp Anda secara realtime, aman, dan 24 jam.",
     footerDesc: "Platform bot WhatsApp profesional. Layanan cepat, stabil, dan aman.",
     loginTitle: "Selamat Datang",
