@@ -198,14 +198,14 @@ export default function Dashboard() {
   };
 
   const [webConfig, setWebConfig] = useState({
-    title: "Wabot",
-    highlight: "Pro",
-    heroTitle: "Otomatisasi WhatsApp Tanpa Batas.",
+    title: "Jadibot Lasak",
+    highlight: "Vip",
+    heroTitle: "Jadibot Lasakvip Tanpa Ribet",
     heroDesc: "Platform bot WhatsApp profesional. Kelola grup, buat stiker otomatis, mainkan mini games, hingga manfaatkan fitur AI langsung dari satu dashboard.",
-    contactEmail: "support@wabotpro.com",
-    contactPhone: "+62 812-3456-7890",
-    favicon: "",
-    logo: "",
+    contactEmail: "nugiaxantika@gmail.com",
+    contactPhone: "+6289692080379",
+    favicon: "https://files.catbox.moe/k9fw2l.png",
+    logo: "https://files.catbox.moe/k9fw2l.png",
     feature1Title: "Manajemen Grup",
     feature1Desc: "Atur pesan welcome, keluarkan anggota, anti-link, hingga anti-spam secara otomatis dan aman.",
     feature2Title: "Sticker Menu",
