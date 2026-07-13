@@ -10,7 +10,7 @@ export default function App() {
   const [isChecking, setIsChecking] = useState(true);
 
   const currentUserEmail = localStorage.getItem("mock_user_email");
-  const isAdmin = currentUserEmail === "gunskamukijakw@gmail.com";
+  const isAdmin = currentUserEmail === "nugiaxantika@gmail.com";
 
   useEffect(() => {
     const fetchMaintenanceAndStatus = async () => {
